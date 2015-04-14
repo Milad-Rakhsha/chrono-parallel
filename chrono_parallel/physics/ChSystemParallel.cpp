@@ -19,6 +19,7 @@ ChSystemParallel::ChSystemParallel(unsigned int max_objects) : ChSystem(1000, 10
   contact_container = new ChContactContainerParallel(data_manager);
   collision_system = new ChCollisionSystemParallel(data_manager);
 
+  fluid_container.SetNull();
   counter = 0;
   timer_accumulator.resize(10, 0);
   cd_accumulator.resize(10, 0);
@@ -94,12 +95,12 @@ int ChSystemParallel::Integrate_Y() {
   // Scatter the states to the Chrono objects (bodies and shafts) and update
   // all physics items at the end of the step.
   DynamicVector<real>& velocities = data_manager->host_data.v;
-  custom_vector<real3>& pos_pointer = data_manager->host_data.pos_data;
-  custom_vector<real4>& rot_pointer = data_manager->host_data.rot_data;
+  custom_vector<real3>& pos_pointer = data_manager->host_data.pos_rigid;
+  custom_vector<real4>& rot_pointer = data_manager->host_data.rot_rigid;
 
 #pragma omp parallel for
   for (int i = 0; i < bodylist.size(); i++) {
-    if (data_manager->host_data.active_data[i] == true) {
+    if (data_manager->host_data.active_rigid[i] == true) {
       bodylist[i]->Variables().Get_qb().SetElement(0, 0, velocities[i * 6 + 0]);
       bodylist[i]->Variables().Get_qb().SetElement(1, 0, velocities[i * 6 + 1]);
       bodylist[i]->Variables().Get_qb().SetElement(2, 0, velocities[i * 6 + 2]);
@@ -124,7 +125,7 @@ int ChSystemParallel::Integrate_Y() {
     if (!data_manager->host_data.shaft_active[i])
       continue;
 
-    shaftlist[i]->Variables().Get_qb().SetElementN(0, velocities[data_manager->num_bodies * 6 + i]);
+    shaftlist[i]->Variables().Get_qb().SetElementN(0, velocities[data_manager->num_rigid_bodies * 6 + i]);
     shaftlist[i]->VariablesQbIncrementPosition(GetStep());
     shaftlist[i]->VariablesQbSetSpeed(GetStep());
     shaftlist[i]->Update(ChTime);
@@ -156,9 +157,6 @@ int ChSystemParallel::Integrate_Y() {
   if (data_manager->settings.perform_thread_tuning) {
     RecomputeThreads();
   }
-  if (data_manager->settings.perform_bin_tuning) {
-    RecomputeBins();
-  }
 
   return 1;
 }
@@ -174,10 +172,10 @@ void ChSystemParallel::AddBody(ChSharedPtr<ChBody> newbody) {
   newbody->SetSystem(this);
   // This is only need because bilaterals need to know what bodies to
   // refer to. Not used by contacts
-  newbody->SetId(data_manager->num_bodies);
+  newbody->SetId(data_manager->num_rigid_bodies);
 
   bodylist.push_back(newbody.get_ptr());
-  data_manager->num_bodies++;
+  data_manager->num_rigid_bodies++;
 
   if (newbody->GetCollide()) {
     newbody->AddCollisionModelsToSystem();
@@ -185,10 +183,10 @@ void ChSystemParallel::AddBody(ChSharedPtr<ChBody> newbody) {
 
   // Reserve space for this body in the system-wide vectors. Note that the
   // actual data is set in UpdateBodies().
-  data_manager->host_data.pos_data.push_back(R3());
-  data_manager->host_data.rot_data.push_back(R4());
-  data_manager->host_data.active_data.push_back(true);
-  data_manager->host_data.collide_data.push_back(true);
+  data_manager->host_data.pos_rigid.push_back(R3());
+  data_manager->host_data.rot_rigid.push_back(R4());
+  data_manager->host_data.active_rigid.push_back(true);
+  data_manager->host_data.collide_rigid.push_back(true);
 
   // Let derived classes reserve space for specific material surface data
   AddMaterialSurfaceData(newbody);
@@ -244,13 +242,12 @@ void ChSystemParallel::AddShaft(ChSharedPtr<ChShaft> shaft) {
   data_manager->host_data.shaft_inr.push_back(0);
   data_manager->host_data.shaft_active.push_back(true);
 }
-
 //
 // Reset forces for all lcp variables
 //
 void ChSystemParallel::ClearForceVariables() {
 #pragma omp parallel for
-  for (int i = 0; i < data_manager->num_bodies; i++) {
+  for (int i = 0; i < data_manager->num_rigid_bodies; i++) {
     bodylist[i]->VariablesFbReset();
   }
 
@@ -275,8 +272,8 @@ void ChSystemParallel::Update() {
   ClearForceVariables();
 
   // Allocate space for the velocities and forces for all objects
-  data_manager->host_data.v.resize(data_manager->num_bodies * 6 + data_manager->num_shafts * 1);
-  data_manager->host_data.hf.resize(data_manager->num_bodies * 6 + data_manager->num_shafts * 1);
+  data_manager->host_data.v.resize(data_manager->num_dof);
+  data_manager->host_data.hf.resize(data_manager->num_dof);
 
   // Clear system-wide vectors for bilateral constraints
   data_manager->host_data.bilateral_mapping.clear();
@@ -285,8 +282,9 @@ void ChSystemParallel::Update() {
   this->LCP_descriptor->BeginInsertion();
   UpdateLinks();
   UpdateOtherPhysics();
-  UpdateBodies();
+  UpdateRigidBodies();
   UpdateShafts();
+  UpdateFluidBodies();
   LCP_descriptor->EndInsertion();
 
   UpdateBilaterals();
@@ -296,12 +294,12 @@ void ChSystemParallel::Update() {
 // Update all bodies in the system and populate system-wide state and force
 // vectors. Note that visualization assets are not updated.
 //
-void ChSystemParallel::UpdateBodies() {
+void ChSystemParallel::UpdateRigidBodies() {
   LOG(INFO) << "ChSystemParallel::UpdateBodies()";
-  custom_vector<real3>& position = data_manager->host_data.pos_data;
-  custom_vector<real4>& rotation = data_manager->host_data.rot_data;
-  custom_vector<bool>& active = data_manager->host_data.active_data;
-  custom_vector<bool>& collide = data_manager->host_data.collide_data;
+  custom_vector<real3>& position = data_manager->host_data.pos_rigid;
+  custom_vector<real4>& rotation = data_manager->host_data.rot_rigid;
+  custom_vector<bool>& active = data_manager->host_data.active_rigid;
+  custom_vector<bool>& collide = data_manager->host_data.collide_rigid;
 
 #pragma omp parallel for
   for (int i = 0; i < bodylist.size(); i++) {
@@ -360,9 +358,17 @@ void ChSystemParallel::UpdateShafts() {
     shaft_inr[i] = shaftlist[i]->Variables().GetInvInertia();
     shaft_active[i] = shaftlist[i]->IsActive();
 
-    data_manager->host_data.v[data_manager->num_bodies * 6 + i] = shaftlist[i]->Variables().Get_qb().GetElementN(0);
-    data_manager->host_data.hf[data_manager->num_bodies * 6 + i] = shaftlist[i]->Variables().Get_fb().GetElementN(0);
+    data_manager->host_data.v[data_manager->num_rigid_bodies * 6 + i] =
+        shaftlist[i]->Variables().Get_qb().GetElementN(0);
+    data_manager->host_data.hf[data_manager->num_rigid_bodies * 6 + i] =
+        shaftlist[i]->Variables().Get_fb().GetElementN(0);
   }
+}
+
+//
+// Update all fluid nodes
+// currently a stub
+void ChSystemParallel::UpdateFluidBodies() {
 }
 
 //
@@ -501,10 +507,11 @@ void ChSystemParallel::Setup() {
 
   // Calculate the total number of degrees of freedom (6 per rigid body and 1
   // for each shaft element).
-  data_manager->num_dof = data_manager->num_bodies * 6 + data_manager->num_shafts;
+  data_manager->num_dof =
+      data_manager->num_rigid_bodies * 6 + data_manager->num_shafts + data_manager->num_fluid_bodies * 3;
 
   // Set variables that are stored in the ChSystem class
-  nbodies = data_manager->num_bodies;
+  nbodies = data_manager->num_rigid_bodies;
   nlinks = -1;
   nphysicsitems = -1;
   ncoords = -1;
@@ -516,7 +523,8 @@ void ChSystemParallel::Setup() {
   ndof = data_manager->num_dof;
   ndoc_w_C = -1;
   ndoc_w_D = -1;
-  ncontacts = data_manager->num_contacts;
+  ncontacts =
+      data_manager->num_rigid_contacts + data_manager->num_rigid_fluid_contacts + data_manager->num_fluid_contacts;
   nbodies_sleep = -1;
   nbodies_fixed = -1;
 }
@@ -562,95 +570,6 @@ void ChSystemParallel::RecomputeThreads() {
     omp_set_num_threads(data_manager->settings.min_threads);
   }
   frame_threads++;
-}
-
-void ChSystemParallel::PerturbBins(bool increase, int number) {
-  ChCollisionSystemParallel* coll_sys = (ChCollisionSystemParallel*)collision_system;
-
-  int3 grid_size = coll_sys->broadphase->getBinsPerAxis();
-#if PRINT_LEVEL == 1
-  cout << "initial: " << grid_size.x << " " << grid_size.y << " " << grid_size.z << endl;
-#endif
-
-  if (increase) {
-    grid_size.x = grid_size.x + number;
-    grid_size.y = grid_size.y + number;
-    grid_size.z = grid_size.z + number;
-  } else {
-    grid_size.x = grid_size.x - number;
-    grid_size.y = grid_size.y - number;
-    grid_size.z = grid_size.z - number;
-
-    if (grid_size.x < 2)
-      grid_size.x = 2;
-    if (grid_size.y < 2)
-      grid_size.y = 2;
-    if (grid_size.z < 2)
-      grid_size.z = 2;
-  }
-
-#if PRINT_LEVEL == 1
-  cout << "final: " << grid_size.x << " " << grid_size.y << " " << grid_size.z << endl;
-#endif
-  coll_sys->broadphase->setBinsPerAxis(grid_size);
-
-  frame_bins++;
-}
-
-void ChSystemParallel::RecomputeBins() {
-  // Do nothing if the current collision system does not support this feature
-  if (!dynamic_cast<ChCollisionSystemParallel*>(collision_system))
-    return;
-  // Insert the current collision time into a list
-  cd_accumulator.insert(cd_accumulator.begin(), timer_collision);
-  // remove the last one from the list
-  cd_accumulator.pop_back();
-  // find the sum of all elements
-  double sum_of_elems_cd = std::accumulate(cd_accumulator.begin(), cd_accumulator.end(), 0.0);
-  // and then get the average time taken;
-  double average_time = sum_of_elems_cd / 10.0;
-
-  // if 0 increase and then measure
-  // if 1 decrease and then measure
-  if (frame_bins == data_manager->settings.bin_tuning_frequency && detect_optimal_bins == 0) {
-    frame_bins = 0;
-    detect_optimal_bins = 1;
-    old_timer_cd = average_time;
-
-    PerturbBins(true, data_manager->settings.bin_perturb_size);
-#if PRINT_LEVEL == 1
-    cout << "current bins increased" << endl;
-#endif
-  } else if (frame_bins == 10 && detect_optimal_bins == 1) {
-    double current_timer = average_time;
-    if (old_timer_cd < current_timer) {
-      PerturbBins(false, data_manager->settings.bin_perturb_size);
-#if PRINT_LEVEL == 1
-      cout << "current bins reduced back" << endl;
-#endif
-    }
-    detect_optimal_bins = 2;
-    frame_bins = 0;
-  }
-  if (frame_bins == data_manager->settings.bin_tuning_frequency && detect_optimal_bins == 2) {
-    frame_bins = 0;
-    detect_optimal_bins = 3;
-    old_timer_cd = average_time;
-    PerturbBins(false, data_manager->settings.bin_perturb_size);
-#if PRINT_LEVEL == 1
-    cout << "current bins decreased" << endl;
-#endif
-  } else if (frame_bins == 10 && detect_optimal_bins == 3) {
-    double current_timer = average_time;
-    if (old_timer_cd < current_timer) {
-      PerturbBins(true, data_manager->settings.bin_perturb_size);
-#if PRINT_LEVEL == 1
-      cout << "current bins increased back" << endl;
-#endif
-    }
-    detect_optimal_bins = 0;
-    frame_bins = 0;
-  }
 }
 
 void ChSystemParallel::ChangeCollisionSystem(COLLISIONSYSTEMTYPE type) {

@@ -54,13 +54,13 @@ void ChSystemParallelDVI::UpdateMaterialSurfaceData(int index, ChBody* body) {
 }
 
 void ChSystemParallelDVI::CalculateContactForces() {
-  uint num_contacts = data_manager->num_contacts;
+  uint num_contacts = data_manager->num_rigid_contacts;
   DynamicVector<real>& Fc = data_manager->host_data.Fc;
 
   data_manager->Fc_current = true;
 
   if (num_contacts == 0) {
-    Fc.resize(6 * data_manager->num_bodies);
+    Fc.resize(6 * data_manager->num_rigid_bodies);
     Fc = 0;
     return;
   }
@@ -70,23 +70,23 @@ void ChSystemParallelDVI::CalculateContactForces() {
   switch (data_manager->settings.solver.solver_mode) {
     case NORMAL: {
       const CompressedMatrix<real>& D_n = data_manager->host_data.D_n;
-      blaze::DenseSubvector<DynamicVector<real> > gamma_n = blaze::subvector(gamma, 0, num_contacts);
+      SubVectorType gamma_n = blaze::subvector(gamma, 0, num_contacts);
       Fc = D_n * gamma_n;
     } break;
     case SLIDING: {
       const CompressedMatrix<real>& D_n = data_manager->host_data.D_n;
       const CompressedMatrix<real>& D_t = data_manager->host_data.D_t;
-      blaze::DenseSubvector<DynamicVector<real> > gamma_n = blaze::subvector(gamma, 0, num_contacts);
-      blaze::DenseSubvector<DynamicVector<real> > gamma_t = blaze::subvector(gamma, num_contacts, 2 * num_contacts);
+      SubVectorType gamma_n = blaze::subvector(gamma, 0, num_contacts);
+      SubVectorType gamma_t = blaze::subvector(gamma, num_contacts, 2 * num_contacts);
       Fc = D_n * gamma_n + D_t * gamma_t;
     } break;
     case SPINNING: {
       const CompressedMatrix<real>& D_n = data_manager->host_data.D_n;
       const CompressedMatrix<real>& D_t = data_manager->host_data.D_t;
       const CompressedMatrix<real>& D_s = data_manager->host_data.D_s;
-      blaze::DenseSubvector<DynamicVector<real> > gamma_n = blaze::subvector(gamma, 0, num_contacts);
-      blaze::DenseSubvector<DynamicVector<real> > gamma_t = blaze::subvector(gamma, num_contacts, 2 * num_contacts);
-      blaze::DenseSubvector<DynamicVector<real> > gamma_s = blaze::subvector(gamma, 3 * num_contacts, 3 * num_contacts);
+      SubVectorType gamma_n = blaze::subvector(gamma, 0, num_contacts);
+      SubVectorType gamma_t = blaze::subvector(gamma, num_contacts, 2 * num_contacts);
+      SubVectorType gamma_s = blaze::subvector(gamma, 3 * num_contacts, 3 * num_contacts);
       Fc = D_n * gamma_n + D_t * gamma_t + D_s * gamma_s;
     } break;
   }
@@ -143,15 +143,15 @@ void ChSystemParallelDVI::AssembleSystem() {
   ChSystem::Update();
   this->contact_container->BeginAddContact();
   chrono::collision::ChCollisionInfo icontact;
-  for (int i = 0; i < data_manager->num_contacts; i++) {
+  for (int i = 0; i < data_manager->num_rigid_contacts; i++) {
     int2 cd_pair = data_manager->host_data.bids_rigid_rigid[i];
     icontact.modelA = bodylist[cd_pair.x]->GetCollisionModel();
     icontact.modelB = bodylist[cd_pair.y]->GetCollisionModel();
     icontact.vN = ToChVector(data_manager->host_data.norm_rigid_rigid[i]);
     icontact.vpA =
-        ToChVector(data_manager->host_data.cpta_rigid_rigid[i] + data_manager->host_data.pos_data[cd_pair.x]);
+        ToChVector(data_manager->host_data.cpta_rigid_rigid[i] + data_manager->host_data.pos_rigid[cd_pair.x]);
     icontact.vpB =
-        ToChVector(data_manager->host_data.cptb_rigid_rigid[i] + data_manager->host_data.pos_data[cd_pair.y]);
+        ToChVector(data_manager->host_data.cptb_rigid_rigid[i] + data_manager->host_data.pos_rigid[cd_pair.y]);
     icontact.distance = data_manager->host_data.dpth_rigid_rigid[i];
     this->contact_container->AddContact(icontact);
   }

@@ -28,28 +28,28 @@ class CH_PARALLEL_API ChSolverAPGDREF : public ChSolverParallel {
   ~ChSolverAPGDREF() {}
 
   void Solve() {
-    if (data_container->num_constraints == 0) {
+    if (data_manager->num_constraints == 0) {
       return;
     }
-    data_container->system_timer.start("ChSolverParallel_Solve");
-    data_container->measures.solver.total_iteration += SolveAPGDREF(
-        max_iteration, data_container->num_constraints, data_container->host_data.R, data_container->host_data.gamma);
-    data_container->system_timer.stop("ChSolverParallel_Solve");
+    data_manager->system_timer.start("ChSolverParallel_Solve");
+    data_manager->measures.solver.total_iteration += SolveAPGDREF(
+        max_iteration, data_manager->num_constraints, data_manager->host_data.R, data_manager->host_data.gamma);
+    data_manager->system_timer.stop("ChSolverParallel_Solve");
   }
 
   // Solve using the APGD method
   uint SolveAPGDREF(const uint max_iter,                  // Maximum number of iterations
                     const uint size,                      // Number of unknowns
-                    const blaze::DynamicVector<real>& r,  // Rhs vector
-                    blaze::DynamicVector<real>& gamma     // The vector of unknowns
+                    const DynamicVector<real>& r,  // Rhs vector
+                    DynamicVector<real>& gamma     // The vector of unknowns
                     );
 
   // Compute the residual for the solver
-  real Res4(blaze::DynamicVector<real>& gamma, const blaze::DynamicVector<real>& r, blaze::DynamicVector<real>& tmp);
+  real Res4(DynamicVector<real>& gamma, const DynamicVector<real>& r, DynamicVector<real>& tmp);
 
   // APGD specific vectors
-  blaze::DynamicVector<real> gamma_hat;
-  blaze::DynamicVector<real> gammaNew, g, y, yNew, tmp;
+  DynamicVector<real> gamma_hat;
+  DynamicVector<real> gammaNew, g, y, yNew, tmp;
 };
 }
 

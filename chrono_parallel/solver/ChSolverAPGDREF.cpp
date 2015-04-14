@@ -3,10 +3,10 @@
 
 using namespace chrono;
 
-real ChSolverAPGDREF::Res4(blaze::DynamicVector<real>& gamma,
-                           const blaze::DynamicVector<real>& r,
-                           blaze::DynamicVector<real>& tmp) {
-  real gdiff = 1.0 / pow(data_container->num_constraints, 2.0);
+real ChSolverAPGDREF::Res4(DynamicVector<real>& gamma,
+                           const DynamicVector<real>& r,
+                           DynamicVector<real>& tmp) {
+  real gdiff = 1.0 / pow(data_manager->num_constraints, 2.0);
   ShurProduct(gamma, tmp);
   tmp = tmp - r;
   tmp = gamma - gdiff * (tmp);
@@ -18,16 +18,15 @@ real ChSolverAPGDREF::Res4(blaze::DynamicVector<real>& gamma,
 
 uint ChSolverAPGDREF::SolveAPGDREF(const uint max_iter,
                                    const uint size,
-                                   const blaze::DynamicVector<real>& r,
-                                   blaze::DynamicVector<real>& gamma) {
-  real& residual = data_container->measures.solver.residual;
-  real& objective_value = data_container->measures.solver.objective_value;
-  custom_vector<real>& iter_hist = data_container->measures.solver.iter_hist;
+                                   const DynamicVector<real>& r,
+                                   DynamicVector<real>& gamma) {
+  real& residual = data_manager->measures.solver.residual;
+  real& objective_value = data_manager->measures.solver.objective_value;
 
   bool verbose = false;
   bool useWarmStarting = true;
   if (verbose)
-    std::cout << "Number of constraints: " << size << "\nNumber of variables  : " << data_container->num_bodies
+    std::cout << "Number of constraints: " << size << "\nNumber of variables  : " << data_manager->num_rigid_bodies
               << std::endl;
 
   real L, t;
@@ -149,7 +148,7 @@ uint ChSolverAPGDREF::SolveAPGDREF(const uint max_iter,
       std::cout << "Residual: " << residual << ", Iter: " << current_iteration << std::endl;
     objective_value = GetObjective(gammaNew, r);
     AtIterationEnd(residual, objective_value);
-    if (residual < data_container->settings.solver.tol_speed) {
+    if (residual < data_manager->settings.solver.tol_speed) {
       // (24) break
       break;
 

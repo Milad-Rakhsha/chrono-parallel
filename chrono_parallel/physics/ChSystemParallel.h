@@ -41,7 +41,7 @@
 #include "chrono_parallel/collision/ChCNarrowphaseMPR.h"
 #include "chrono_parallel/collision/ChCNarrowphaseR.h"
 #include "chrono_parallel/math/ChParallelMath.h"
-
+#include "chrono_parallel/physics/ChNodeFluid.h"
 namespace chrono {
 
 class CH_PARALLEL_API ChSystemParallel : public ChSystem {
@@ -60,11 +60,10 @@ class CH_PARALLEL_API ChSystemParallel : public ChSystem {
   void UpdateBilaterals();
   void UpdateLinks();
   void UpdateOtherPhysics();
-  void UpdateBodies();
+  void UpdateRigidBodies();
   void UpdateShafts();
+  void UpdateFluidBodies();
   void RecomputeThreads();
-  void RecomputeBins();
-  void PerturbBins(bool increase, int number = 2);
 
   virtual void AddMaterialSurfaceData(ChSharedPtr<ChBody> newbody) = 0;
   virtual void UpdateMaterialSurfaceData(int index, ChBody* body) = 0;
@@ -73,11 +72,13 @@ class CH_PARALLEL_API ChSystemParallel : public ChSystem {
 
   virtual void PrintStepStats() { data_manager->system_timer.PrintReport(); }
 
-  int GetNumBodies() { return data_manager->num_bodies; }
+  int GetNumBodies() { return data_manager->num_rigid_bodies + data_manager->num_fluid_bodies; }
 
   int GetNumShafts() { return data_manager->num_shafts; }
 
-  int GetNcontacts() { return data_manager->num_contacts; }
+  int GetNcontacts() {
+    return data_manager->num_rigid_contacts + data_manager->num_rigid_fluid_contacts + data_manager->num_fluid_contacts;
+  }
 
   int GetNumBilaterals() { return data_manager->num_bilaterals; }
 
@@ -112,6 +113,7 @@ class CH_PARALLEL_API ChSystemParallel : public ChSystem {
   void AddShaft(ChSharedPtr<ChShaft> shaft);
 
   std::vector<ChShaft*> shaftlist;
+  ChSharedPtr<ChNodeFluid> fluid_container;
 };
 
 class CH_PARALLEL_API ChSystemParallelDVI : public ChSystemParallel {

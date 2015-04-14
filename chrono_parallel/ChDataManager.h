@@ -47,7 +47,17 @@
 
 using blaze::CompressedMatrix;
 using blaze::DynamicVector;
+using blaze::SparseSubmatrix;
+using blaze::submatrix;
+using blaze::subvector;
 using thrust::host_vector;
+
+typedef blaze::SparseSubmatrix<CompressedMatrix<real> > SubMatrixType;
+typedef blaze::DenseSubvector<DynamicVector<real> > SubVectorType;
+
+typedef blaze::SparseSubmatrix<const CompressedMatrix<real> > ConstSubMatrixType;
+typedef blaze::DenseSubvector<const DynamicVector<real> > ConstSubVectorType;
+
 namespace chrono {
 
 // The maximum number of shear history contacts per smaller body (DEM)
@@ -55,16 +65,17 @@ namespace chrono {
 
 struct host_container {
   // Collision data
-  host_vector<real3> ObA_rigid;    // Position of shape
-  host_vector<real3> ObB_rigid;    // Size of shape (dims or convex data)
-  host_vector<real3> ObC_rigid;    // Rounded size
-  host_vector<real4> ObR_rigid;    // Shape rotation
-  host_vector<short2> fam_rigid;   // Family information
-  host_vector<int> typ_rigid;      // Shape type
-  host_vector<real> margin_rigid;  // Inner collision margins
-  host_vector<uint> id_rigid;      // Body identifier for each shape
-  host_vector<real3> aabb_rigid;   // List of bounding boxes
-  host_vector<real3> convex_data;  // list of convex points
+  host_vector<real3> ObA_rigid;       // Position of shape
+  host_vector<real3> ObB_rigid;       // Size of shape (dims or convex data)
+  host_vector<real3> ObC_rigid;       // Rounded size
+  host_vector<real4> ObR_rigid;       // Shape rotation
+  host_vector<short2> fam_rigid;      // Family information
+  host_vector<int> typ_rigid;         // Shape type
+  host_vector<real> margin_rigid;     // Inner collision margins
+  host_vector<uint> id_rigid;         // Body identifier for each shape
+  host_vector<real3> aabb_min_rigid;  // List of bounding boxes minimum point
+  host_vector<real3> aabb_max_rigid;  // List of bounding boxes maximum point
+  host_vector<real3> convex_data;     // list of convex points
 
   // Contact data
   host_vector<real3> norm_rigid_rigid;
@@ -75,6 +86,13 @@ struct host_container {
   host_vector<int2> bids_rigid_rigid;
   host_vector<long long> pair_rigid_rigid;
 
+  host_vector<real3> norm_rigid_fluid;
+  host_vector<real3> cpta_rigid_fluid;
+  host_vector<real> dpth_rigid_fluid;
+  host_vector<int2> bids_rigid_fluid;
+
+  host_vector<int2> bids_fluid_fluid;
+
   // Contact forces (DEM)
   // These vectors hold the total contact force and torque, respectively,
   // for bodies that are involved in at least one contact.
@@ -82,8 +100,8 @@ struct host_container {
   host_vector<real3> ct_body_torque;  // Total contact torque on these bodies
 
   // Contact shear history (DEM)
-  host_vector<int3> shear_neigh; // Neighbor list of contacting bodies and shapes
-  host_vector<real3> shear_disp; // Accumulated shear displacement for each neighbor
+  host_vector<int3> shear_neigh;  // Neighbor list of contacting bodies and shapes
+  host_vector<real3> shear_disp;  // Accumulated shear displacement for each neighbor
 
   // Mapping from all bodies in the system to bodies involved in a contact.
   // For bodies that are currently not in contact, the mapping entry is -1.
@@ -102,12 +120,15 @@ struct host_container {
   host_vector<real> coh_rigid_rigid;
 
   // Object data
-  host_vector<real3> pos_data, pos_new_data;
-  host_vector<real4> rot_data, rot_new_data;
-  // thrust::host_vector<M33> inr_data;
-  host_vector<bool> active_data;
-  host_vector<bool> collide_data;
-  host_vector<real> mass_data;
+  host_vector<real3> pos_rigid;
+  host_vector<real4> rot_rigid;
+  host_vector<bool> active_rigid;
+  host_vector<bool> collide_rigid;
+  host_vector<real> mass_rigid;
+
+  host_vector<real3> pos_fluid;
+  host_vector<real3> vel_fluid;
+  host_vector<real> den_fluid;
 
   // Bilateral constraint type (all supported constraints)
   host_vector<int> bilateral_type;
@@ -149,21 +170,12 @@ struct host_container {
   // M_inv is the inverse mass matrix, This matrix, if holding the full inertia
   // tensor is block diagonal
   CompressedMatrix<real> M_inv;
-  // M is the mass matrix, this is only computed in certain situations for some
-  // experimental features in the solver
-  CompressedMatrix<real> M;
   // Minv_D holds M_inv multiplied by D, this is done as a preprocessing step
   // so that later, when the full matrix vector product is needed it can be
   // performed in two steps, first R = Minv_D*x, and then D_T*R where R is just
   // a temporary variable used here for illustrative purposes. In reality the
   // entire operation happens inline without a temp variable.
   CompressedMatrix<real> M_invD_n, M_invD_t, M_invD_s, M_invD_b;
-  // N holds the full shur matrix product D_T * M_inv_D
-  // Not necessarily used in the code, more for testing purposes
-  CompressedMatrix<real> N_nn, N_nt, N_ns, N_nb;
-  CompressedMatrix<real> N_tn, N_tt, N_ts, N_tb;
-  CompressedMatrix<real> N_sn, N_st, N_ss, N_sb;
-  CompressedMatrix<real> N_bn, N_bt, N_bs, N_bb;
 
   DynamicVector<real> R_full;  // The right hand side of the system
   DynamicVector<real> R;       // The rhs of the system, changes during solve
@@ -202,16 +214,18 @@ class CH_PARALLEL_API ChParallelDataManager {
   std::vector<ChPhysicsItem*>* other_physics_list;  // List to other items
 
   // Indexing variables
-  uint num_bodies;        // The number of rigid bodies in a system
-  uint num_shafts;        // the number of shafts in a system
-  uint num_dof;           // The number of degrees of freedom in the system
-  uint num_shapes;        // The number of collision models in a system
-  uint num_contacts;      // The number of contacts in a system
-  uint old_num_contacts;  // The number of contacts during the previous step
-  uint num_unilaterals;   // The number of contact constraints
-  uint num_bilaterals;    // The number of bilateral constraints
-  uint num_constraints;   // Total number of constraints
-  uint nnz_bilaterals;    // The number of non-zero entries in the bilateral Jacobian
+  uint num_rigid_bodies;          // The number of rigid bodies in a system
+  uint num_fluid_bodies;          // The number of fluid bodies in the system
+  uint num_shafts;                // The number of shafts in a system
+  uint num_dof;                   // The number of degrees of freedom in the system
+  uint num_rigid_shapes;          // The number of collision models in a system
+  uint num_rigid_contacts;        // The number of contacts between rigid bodies in a system
+  uint num_rigid_fluid_contacts;  // The number of contacts between rigid and fluid objects
+  uint num_fluid_contacts;        // The number of contacts between fluid objects
+  uint num_unilaterals;           // The number of contact constraints
+  uint num_bilaterals;            // The number of bilateral constraints
+  uint num_constraints;           // Total number of constraints
+  uint nnz_bilaterals;            // The number of non-zero entries in the bilateral Jacobian
 
   // Flag indicating whether or not the contact forces are current (DVI only).
   bool Fc_current;
@@ -223,9 +237,9 @@ class CH_PARALLEL_API ChParallelDataManager {
   measures_container measures;
 
   // Output a vector (one dimensional matrix) from blaze to a file
-  int OutputBlazeVector(blaze::DynamicVector<real> src, std::string filename);
+  int OutputBlazeVector(DynamicVector<real> src, std::string filename);
   // Output a sparse blaze matrix to a file
-  int OutputBlazeMatrix(blaze::CompressedMatrix<real> src, std::string filename);
+  int OutputBlazeMatrix(CompressedMatrix<real> src, std::string filename);
   // Convenience function that outputs all of the data associated for a system
   // This is useful when debugging
   int ExportCurrentSystem(std::string output_dir);

@@ -149,8 +149,8 @@ void ChOpenGLHUD::GenerateSystem(ChSystem* physics_system) {
   int num_contacts = 0;
   int num_bilaterals = 0;
   if (ChSystemParallel* parallel_system = dynamic_cast<ChSystemParallel*>(physics_system)) {
-    num_shapes = parallel_system->data_manager->num_shapes;
-    num_bodies = parallel_system->data_manager->num_bodies + parallel_system->GetNphysicsItems();
+    num_shapes = parallel_system->data_manager->num_rigid_shapes;
+    num_bodies = parallel_system->data_manager->num_rigid_bodies + parallel_system->GetNphysicsItems();
     num_contacts = parallel_system->GetNcontacts();
     num_bilaterals = parallel_system->data_manager->num_bilaterals;
   } else {
@@ -211,26 +211,23 @@ void ChOpenGLHUD::GenerateSolver(ChSystem* physics_system) {
 
 void ChOpenGLHUD::GenerateCD(ChSystem* physics_system) {
   if (ChSystemParallelDVI* parallel_sys = dynamic_cast<ChSystemParallelDVI*>(physics_system)) {
-    int3 grid_size = parallel_sys->data_manager->measures.collision.grid_size;
+    int3 bins_per_axis = parallel_sys->data_manager->settings.collision.bins_per_axis;
     real3 bin_size_vec = 1.0 / parallel_sys->data_manager->measures.collision.bin_size_vec;
     real3 min_pt = parallel_sys->data_manager->measures.collision.min_bounding_point;
     real3 max_pt = parallel_sys->data_manager->measures.collision.max_bounding_point;
     real3 center = (min_pt + max_pt) * .5;
-    int max_aabb_per_bin = parallel_sys->data_manager->measures.collision.max_aabb_per_bin;
     sprintf(buffer, "COLLISION INFO");
     text.Render(buffer, RIGHT, TOP - SPACING * 11, sx, sy);
-    sprintf(buffer, "DIMS  [%d,%d,%d]", grid_size.x, grid_size.y, grid_size.z);
+    sprintf(buffer, "DIMS  [%d,%d,%d]", bins_per_axis.x, bins_per_axis.y, bins_per_axis.z);
     text.Render(buffer, RIGHT, TOP - SPACING * 12, sx, sy);
-    sprintf(buffer, "MAX   %d", max_aabb_per_bin);
-    text.Render(buffer, RIGHT, TOP - SPACING * 13, sx, sy);
     sprintf(buffer, "SX    %f", bin_size_vec.x);
-    text.Render(buffer, RIGHT, TOP - SPACING * 14, sx, sy);
+    text.Render(buffer, RIGHT, TOP - SPACING * 13, sx, sy);
     sprintf(buffer, "SY    %f", bin_size_vec.y);
-    text.Render(buffer, RIGHT, TOP - SPACING * 15, sx, sy);
+    text.Render(buffer, RIGHT, TOP - SPACING * 14, sx, sy);
     sprintf(buffer, "SZ    %f", bin_size_vec.z);
+    text.Render(buffer, RIGHT, TOP - SPACING * 15, sx, sy);
+    sprintf(buffer, "RIGID %d", parallel_sys->data_manager->num_rigid_contacts);
     text.Render(buffer, RIGHT, TOP - SPACING * 16, sx, sy);
-    sprintf(buffer, "RIGID %d", parallel_sys->data_manager->num_contacts);
-    text.Render(buffer, RIGHT, TOP - SPACING * 17, sx, sy);
   } else {
     // ChCollisionSystemBullet* collision_system = (ChCollisionSystemBullet*)physics_system->GetCollisionSystem();
     // btDbvtBroadphase * broadphase = (btDbvtBroadphase* )

@@ -23,142 +23,141 @@ using namespace chrono;
 void ChLcpSolverParallelDVI::RunTimeStep() {
   LOG(INFO) << "ChLcpSolverParallelDVI::RunTimeStep";
   // Compute the offsets and number of constrains depending on the solver mode
-  if (data_container->settings.solver.solver_mode == NORMAL) {
+  if (data_manager->settings.solver.solver_mode == NORMAL) {
     rigid_rigid.offset = 1;
-    data_container->num_unilaterals = 1 * data_container->num_contacts;
-  } else if (data_container->settings.solver.solver_mode == SLIDING) {
+    data_manager->num_unilaterals = 1 * data_manager->num_rigid_contacts;
+  } else if (data_manager->settings.solver.solver_mode == SLIDING) {
     rigid_rigid.offset = 3;
-    data_container->num_unilaterals = 3 * data_container->num_contacts;
-  } else if (data_container->settings.solver.solver_mode == SPINNING) {
+    data_manager->num_unilaterals = 3 * data_manager->num_rigid_contacts;
+  } else if (data_manager->settings.solver.solver_mode == SPINNING) {
     rigid_rigid.offset = 6;
-    data_container->num_unilaterals = 6 * data_container->num_contacts;
+    data_manager->num_unilaterals = 6 * data_manager->num_rigid_contacts;
   }
   // This is the total number of constraints
-  data_container->num_constraints = data_container->num_unilaterals + data_container->num_bilaterals;
+  data_manager->num_constraints = data_manager->num_unilaterals + data_manager->num_bilaterals;
 
   // Generate the mass matrix and compute M_inv_k
   ComputeMassMatrix();
 
-  data_container->host_data.gamma.resize(data_container->num_constraints);
-  data_container->host_data.gamma.reset();
+  data_manager->host_data.gamma.resize(data_manager->num_constraints);
+  data_manager->host_data.gamma.reset();
 
   // Perform any setup tasks for all constraint types
-  rigid_rigid.Setup(data_container);
-  bilateral.Setup(data_container);
+  rigid_rigid.Setup(data_manager);
+  bilateral.Setup(data_manager);
   // Clear and reset solver history data and counters
   solver->current_iteration = 0;
-  data_container->measures.solver.total_iteration = 0;
-  data_container->measures.solver.maxd_hist.clear();
-  data_container->measures.solver.maxdeltalambda_hist.clear();
-  data_container->measures.solver.iter_hist.clear();
+  data_manager->measures.solver.total_iteration = 0;
+  data_manager->measures.solver.maxd_hist.clear();
+  data_manager->measures.solver.maxdeltalambda_hist.clear();
   // Set pointers to constraint objects and perform setup actions for solver
   solver->rigid_rigid = &rigid_rigid;
   solver->bilateral = &bilateral;
-  solver->Setup(data_container);
+  solver->Setup(data_manager);
 
   ComputeD();
   ComputeE();
   ComputeR();
-  ComputeN();
+  //ComputeN();
 
-  PreSolve();
+  //PreSolve();
 
-  data_container->system_timer.start("ChLcpSolverParallel_Solve");
+  data_manager->system_timer.start("ChLcpSolverParallel_Solve");
 
-  //  if (data_container->settings.solver.max_iteration_bilateral > 0) {
-  //    solver->SetMaxIterations(data_container->settings.solver.max_iteration_bilateral);
-  //    data_container->settings.solver.local_solver_mode = BILATERAL;
+  //  if (data_manager->settings.solver.max_iteration_bilateral > 0) {
+  //    solver->SetMaxIterations(data_manager->settings.solver.max_iteration_bilateral);
+  //    data_manager->settings.solver.local_solver_mode = BILATERAL;
   //    SetR();
   //    solver->Solve();
   //  }
 
   PerformStabilization();
 
-  if (data_container->settings.solver.solver_mode == NORMAL || data_container->settings.solver.solver_mode == SLIDING ||
-      data_container->settings.solver.solver_mode == SPINNING) {
-    if (data_container->settings.solver.max_iteration_normal > 0) {
-      solver->SetMaxIterations(data_container->settings.solver.max_iteration_normal);
-      data_container->settings.solver.local_solver_mode = NORMAL;
+  if (data_manager->settings.solver.solver_mode == NORMAL || data_manager->settings.solver.solver_mode == SLIDING ||
+      data_manager->settings.solver.solver_mode == SPINNING) {
+    if (data_manager->settings.solver.max_iteration_normal > 0) {
+      solver->SetMaxIterations(data_manager->settings.solver.max_iteration_normal);
+      data_manager->settings.solver.local_solver_mode = NORMAL;
       SetR();
       LOG(INFO) << "ChLcpSolverParallelDVI::RunTimeStep - Solve Normal";
       solver->Solve();
     }
   }
-  if (data_container->settings.solver.solver_mode == SLIDING ||
-      data_container->settings.solver.solver_mode == SPINNING) {
-    if (data_container->settings.solver.max_iteration_sliding > 0) {
-      solver->SetMaxIterations(data_container->settings.solver.max_iteration_sliding);
-      data_container->settings.solver.local_solver_mode = SLIDING;
+  if (data_manager->settings.solver.solver_mode == SLIDING ||
+      data_manager->settings.solver.solver_mode == SPINNING) {
+    if (data_manager->settings.solver.max_iteration_sliding > 0) {
+      solver->SetMaxIterations(data_manager->settings.solver.max_iteration_sliding);
+      data_manager->settings.solver.local_solver_mode = SLIDING;
       SetR();
       LOG(INFO) << "ChLcpSolverParallelDVI::RunTimeStep - Solve Sliding";
       solver->Solve();
     }
   }
-  if (data_container->settings.solver.solver_mode == SPINNING) {
-    if (data_container->settings.solver.max_iteration_spinning > 0) {
-      solver->SetMaxIterations(data_container->settings.solver.max_iteration_spinning);
-      data_container->settings.solver.local_solver_mode = SPINNING;
+  if (data_manager->settings.solver.solver_mode == SPINNING) {
+    if (data_manager->settings.solver.max_iteration_spinning > 0) {
+      solver->SetMaxIterations(data_manager->settings.solver.max_iteration_spinning);
+      data_manager->settings.solver.local_solver_mode = SPINNING;
       SetR();
       LOG(INFO) << "ChLcpSolverParallelDVI::RunTimeStep - Solve Spinning";
       solver->Solve();
     }
   }
 
-  data_container->Fc_current = false;
-  data_container->system_timer.stop("ChLcpSolverParallel_Solve");
+  data_manager->Fc_current = false;
+  data_manager->system_timer.stop("ChLcpSolverParallel_Solve");
 
   ComputeImpulses();
 
-  for (int i = 0; i < data_container->measures.solver.iter_hist.size(); i++) {
-    AtIterationEnd(data_container->measures.solver.maxd_hist[i], data_container->measures.solver.maxdeltalambda_hist[i],
-                   data_container->measures.solver.iter_hist[i]);
+  for (int i = 0; i < data_manager->measures.solver.maxd_hist.size(); i++) {
+    AtIterationEnd(data_manager->measures.solver.maxd_hist[i], data_manager->measures.solver.maxdeltalambda_hist[i],
+                   i);
   }
-  tot_iterations = data_container->measures.solver.iter_hist.size();
+  tot_iterations = data_manager->measures.solver.maxd_hist.size();
 
   LOG(TRACE) << "Solve Done: " << residual;
 }
 
 void ChLcpSolverParallelDVI::ComputeD() {
   LOG(INFO) << "ChLcpSolverParallelDVI::ComputeD()";
-  data_container->system_timer.start("ChLcpSolverParallel_D");
-  uint num_constraints = data_container->num_constraints;
+  data_manager->system_timer.start("ChLcpSolverParallel_D");
+  uint num_constraints = data_manager->num_constraints;
   if (num_constraints <= 0) {
     return;
   }
 
-  uint num_bodies = data_container->num_bodies;
-  uint num_shafts = data_container->num_shafts;
-  uint num_dof = data_container->num_dof;
-  uint num_contacts = data_container->num_contacts;
-  uint num_bilaterals = data_container->num_bilaterals;
-  uint nnz_bilaterals = data_container->nnz_bilaterals;
+  uint num_bodies = data_manager->num_rigid_bodies;
+  uint num_shafts = data_manager->num_shafts;
+  uint num_dof = data_manager->num_dof;
+  uint num_contacts = data_manager->num_rigid_contacts;
+  uint num_bilaterals = data_manager->num_bilaterals;
+  uint nnz_bilaterals = data_manager->nnz_bilaterals;
 
-  int nnz_normal = 6 * 2 * data_container->num_contacts;
-  int nnz_tangential = 6 * 4 * data_container->num_contacts;
-  int nnz_spinning = 6 * 3 * data_container->num_contacts;
+  int nnz_normal = 6 * 2 * data_manager->num_rigid_contacts;
+  int nnz_tangential = 6 * 4 * data_manager->num_rigid_contacts;
+  int nnz_spinning = 6 * 3 * data_manager->num_rigid_contacts;
 
-  int num_normal = 1 * data_container->num_contacts;
-  int num_tangential = 2 * data_container->num_contacts;
-  int num_spinning = 3 * data_container->num_contacts;
+  int num_normal = 1 * data_manager->num_rigid_contacts;
+  int num_tangential = 2 * data_manager->num_rigid_contacts;
+  int num_spinning = 3 * data_manager->num_rigid_contacts;
 
-  CompressedMatrix<real>& D_n_T = data_container->host_data.D_n_T;
-  CompressedMatrix<real>& D_t_T = data_container->host_data.D_t_T;
-  CompressedMatrix<real>& D_s_T = data_container->host_data.D_s_T;
-  CompressedMatrix<real>& D_b_T = data_container->host_data.D_b_T;
+  CompressedMatrix<real>& D_n_T = data_manager->host_data.D_n_T;
+  CompressedMatrix<real>& D_t_T = data_manager->host_data.D_t_T;
+  CompressedMatrix<real>& D_s_T = data_manager->host_data.D_s_T;
+  CompressedMatrix<real>& D_b_T = data_manager->host_data.D_b_T;
 
-  CompressedMatrix<real>& D_n = data_container->host_data.D_n;
-  CompressedMatrix<real>& D_t = data_container->host_data.D_t;
-  CompressedMatrix<real>& D_s = data_container->host_data.D_s;
-  CompressedMatrix<real>& D_b = data_container->host_data.D_b;
+  CompressedMatrix<real>& D_n = data_manager->host_data.D_n;
+  CompressedMatrix<real>& D_t = data_manager->host_data.D_t;
+  CompressedMatrix<real>& D_s = data_manager->host_data.D_s;
+  CompressedMatrix<real>& D_b = data_manager->host_data.D_b;
 
-  CompressedMatrix<real>& M_invD_n = data_container->host_data.M_invD_n;
-  CompressedMatrix<real>& M_invD_t = data_container->host_data.M_invD_t;
-  CompressedMatrix<real>& M_invD_s = data_container->host_data.M_invD_s;
-  CompressedMatrix<real>& M_invD_b = data_container->host_data.M_invD_b;
+  CompressedMatrix<real>& M_invD_n = data_manager->host_data.M_invD_n;
+  CompressedMatrix<real>& M_invD_t = data_manager->host_data.M_invD_t;
+  CompressedMatrix<real>& M_invD_s = data_manager->host_data.M_invD_s;
+  CompressedMatrix<real>& M_invD_b = data_manager->host_data.M_invD_b;
 
-  const CompressedMatrix<real>& M_inv = data_container->host_data.M_inv;
+  const CompressedMatrix<real>& M_inv = data_manager->host_data.M_inv;
 
-  switch (data_container->settings.solver.solver_mode) {
+  switch (data_manager->settings.solver.solver_mode) {
     case NORMAL:
       CLEAR_RESERVE_RESIZE(D_n_T, nnz_normal, num_normal, num_dof)
       CLEAR_RESERVE_RESIZE(D_n, nnz_normal, num_dof, num_normal)
@@ -198,201 +197,116 @@ void ChLcpSolverParallelDVI::ComputeD() {
   rigid_rigid.Build_D();
   bilateral.Build_D();
 
-  data_container->system_timer.stop("ChLcpSolverParallel_D");
+  data_manager->system_timer.stop("ChLcpSolverParallel_D");
 }
 
 void ChLcpSolverParallelDVI::ComputeE() {
   LOG(INFO) << "ChLcpSolverParallelDVI::ComputeE()";
-  data_container->system_timer.start("ChLcpSolverParallel_E");
-  if (data_container->num_constraints <= 0) {
+  data_manager->system_timer.start("ChLcpSolverParallel_E");
+  if (data_manager->num_constraints <= 0) {
     return;
   }
 
-  data_container->host_data.E.resize(data_container->num_constraints);
-  reset(data_container->host_data.E);
+  data_manager->host_data.E.resize(data_manager->num_constraints);
+  reset(data_manager->host_data.E);
 
   rigid_rigid.Build_E();
   bilateral.Build_E();
-  data_container->system_timer.stop("ChLcpSolverParallel_E");
+  data_manager->system_timer.stop("ChLcpSolverParallel_E");
 }
 
 void ChLcpSolverParallelDVI::ComputeR() {
   LOG(INFO) << "ChLcpSolverParallelDVI::ComputeR()";
-  data_container->system_timer.start("ChLcpSolverParallel_R");
-  if (data_container->num_constraints <= 0) {
+  data_manager->system_timer.start("ChLcpSolverParallel_R");
+  if (data_manager->num_constraints <= 0) {
     return;
   }
 
-  const CompressedMatrix<real>& D_n_T = data_container->host_data.D_n_T;
-  const CompressedMatrix<real>& D_t_T = data_container->host_data.D_t_T;
-  const CompressedMatrix<real>& D_s_T = data_container->host_data.D_s_T;
-  const CompressedMatrix<real>& D_b_T = data_container->host_data.D_b_T;
+  const CompressedMatrix<real>& D_n_T = data_manager->host_data.D_n_T;
+  const CompressedMatrix<real>& D_t_T = data_manager->host_data.D_t_T;
+  const CompressedMatrix<real>& D_s_T = data_manager->host_data.D_s_T;
+  const CompressedMatrix<real>& D_b_T = data_manager->host_data.D_b_T;
 
-  const DynamicVector<real>& M_invk = data_container->host_data.M_invk;
+  const DynamicVector<real>& M_invk = data_manager->host_data.M_invk;
 
-  DynamicVector<real>& R = data_container->host_data.R_full;
-  DynamicVector<real>& b = data_container->host_data.b;
+  DynamicVector<real>& R = data_manager->host_data.R_full;
+  DynamicVector<real>& b = data_manager->host_data.b;
 
-  uint num_contacts = data_container->num_contacts;
-  uint num_unilaterals = data_container->num_unilaterals;
-  uint num_bilaterals = data_container->num_bilaterals;
+  uint num_contacts = data_manager->num_rigid_contacts;
+  uint num_unilaterals = data_manager->num_unilaterals;
+  uint num_bilaterals = data_manager->num_bilaterals;
 
-  b.resize(data_container->num_constraints);
+  b.resize(data_manager->num_constraints);
   reset(b);
 
-  R.resize(data_container->num_constraints);
+  R.resize(data_manager->num_constraints);
   reset(R);
 
   rigid_rigid.Build_b();
   bilateral.Build_b();
 
-  blaze::DenseSubvector<DynamicVector<real> > b_n = blaze::subvector(b, 0, num_contacts);
-  blaze::DenseSubvector<DynamicVector<real> > R_n = blaze::subvector(R, 0, num_contacts);
+  SubVectorType b_n = blaze::subvector(b, 0, num_contacts);
+  SubVectorType R_n = blaze::subvector(R, 0, num_contacts);
 
-  blaze::DenseSubvector<DynamicVector<real> > b_b = blaze::subvector(b, num_unilaterals, num_bilaterals);
-  blaze::DenseSubvector<DynamicVector<real> > R_b = blaze::subvector(R, num_unilaterals, num_bilaterals);
+  SubVectorType b_b = blaze::subvector(b, num_unilaterals, num_bilaterals);
+  SubVectorType R_b = blaze::subvector(R, num_unilaterals, num_bilaterals);
 
   R_b = -b_b - D_b_T * M_invk;
-  switch (data_container->settings.solver.solver_mode) {
+  switch (data_manager->settings.solver.solver_mode) {
     case NORMAL: {
       R_n = -b_n - D_n_T * M_invk;
     } break;
 
     case SLIDING: {
-      // blaze::DenseSubvector<DynamicVector<real> > b_t = blaze::subvector(b, num_contacts, num_contacts * 2);
-      blaze::DenseSubvector<DynamicVector<real> > R_t = blaze::subvector(R, num_contacts, num_contacts * 2);
+      // SubVectorType b_t = blaze::subvector(b, num_contacts, num_contacts * 2);
+      SubVectorType R_t = blaze::subvector(R, num_contacts, num_contacts * 2);
 
       R_n = -b_n - D_n_T * M_invk;
       R_t = -D_t_T * M_invk;
     } break;
 
     case SPINNING: {
-      // blaze::DenseSubvector<DynamicVector<real> > b_t = blaze::subvector(b, num_contacts, num_contacts * 2);
-      blaze::DenseSubvector<DynamicVector<real> > R_t = blaze::subvector(R, num_contacts, num_contacts * 2);
+      // SubVectorType b_t = blaze::subvector(b, num_contacts, num_contacts * 2);
+      SubVectorType R_t = blaze::subvector(R, num_contacts, num_contacts * 2);
 
-      // blaze::DenseSubvector<DynamicVector<real> > b_s = blaze::subvector(b, num_contacts * 3, num_contacts * 3);
-      blaze::DenseSubvector<DynamicVector<real> > R_s = blaze::subvector(R, num_contacts * 3, num_contacts * 3);
+      // SubVectorType b_s = blaze::subvector(b, num_contacts * 3, num_contacts * 3);
+      SubVectorType R_s = blaze::subvector(R, num_contacts * 3, num_contacts * 3);
 
       R_n = -b_n - D_n_T * M_invk;
       R_t = -D_t_T * M_invk;
       R_s = -D_s_T * M_invk;
     } break;
   }
-  data_container->system_timer.stop("ChLcpSolverParallel_R");
+  data_manager->system_timer.stop("ChLcpSolverParallel_R");
 }
 
 void ChLcpSolverParallelDVI::ComputeN() {
   LOG(INFO) << "ChLcpSolverParallelDVI::ComputeN()";
-  if (!data_container->settings.solver.compute_N) {
+  if (!data_manager->settings.solver.compute_N) {
     return;
   }
 
-  data_container->system_timer.start("ChLcpSolverParallel_N");
-  const CompressedMatrix<real>& D_n_T = data_container->host_data.D_n_T;
-  const CompressedMatrix<real>& D_t_T = data_container->host_data.D_t_T;
-  const CompressedMatrix<real>& D_s_T = data_container->host_data.D_s_T;
-  const CompressedMatrix<real>& D_b_T = data_container->host_data.D_b_T;
+  data_manager->system_timer.start("ChLcpSolverParallel_N");
 
-  const CompressedMatrix<real>& D_n = data_container->host_data.D_n;
-  const CompressedMatrix<real>& D_t = data_container->host_data.D_t;
-  const CompressedMatrix<real>& D_s = data_container->host_data.D_s;
-  const CompressedMatrix<real>& D_b = data_container->host_data.D_b;
-
-  const CompressedMatrix<real>& M_invD_n = data_container->host_data.M_invD_n;
-  const CompressedMatrix<real>& M_invD_t = data_container->host_data.M_invD_t;
-  const CompressedMatrix<real>& M_invD_s = data_container->host_data.M_invD_s;
-  const CompressedMatrix<real>& M_invD_b = data_container->host_data.M_invD_b;
-
-  CompressedMatrix<real>& N_nn = data_container->host_data.N_nn;
-  CompressedMatrix<real>& N_nt = data_container->host_data.N_nt;
-  CompressedMatrix<real>& N_ns = data_container->host_data.N_ns;
-  CompressedMatrix<real>& N_nb = data_container->host_data.N_nb;
-
-  CompressedMatrix<real>& N_tn = data_container->host_data.N_tn;
-  CompressedMatrix<real>& N_tt = data_container->host_data.N_tt;
-  CompressedMatrix<real>& N_ts = data_container->host_data.N_ts;
-  CompressedMatrix<real>& N_tb = data_container->host_data.N_tb;
-
-  CompressedMatrix<real>& N_sn = data_container->host_data.N_sn;
-  CompressedMatrix<real>& N_st = data_container->host_data.N_st;
-  CompressedMatrix<real>& N_ss = data_container->host_data.N_ss;
-  CompressedMatrix<real>& N_sb = data_container->host_data.N_sb;
-
-  CompressedMatrix<real>& N_bn = data_container->host_data.N_bn;
-  CompressedMatrix<real>& N_bt = data_container->host_data.N_bt;
-  CompressedMatrix<real>& N_bs = data_container->host_data.N_bs;
-  CompressedMatrix<real>& N_bb = data_container->host_data.N_bb;
-
-  const DynamicVector<real>& E = data_container->host_data.E;
-
-  uint num_contacts = data_container->num_contacts;
-  uint num_unilaterals = data_container->num_unilaterals;
-  uint num_bilaterals = data_container->num_bilaterals;
-
-  switch (data_container->settings.solver.solver_mode) {
-    case NORMAL: {
-      N_bb = D_b_T * M_invD_b;
-      N_bn = D_b_T * M_invD_n;
-
-      N_nn = D_n_T * M_invD_n;
-      N_nb = D_n_T * M_invD_b;
-    } break;
-
-    case SLIDING: {
-      N_bb = D_b_T * M_invD_b;
-      N_bn = D_b_T * M_invD_n;
-      N_bt = D_b_T * M_invD_t;
-
-      N_nb = D_n_T * M_invD_b;
-      N_nn = D_n_T * M_invD_n;
-      N_nt = D_n_T * M_invD_t;
-
-      N_tb = D_t_T * M_invD_b;
-      N_tn = D_t_T * M_invD_n;
-      N_tt = D_t_T * M_invD_t;
-    } break;
-
-    case SPINNING: {
-      N_bb = D_b_T * M_invD_b;
-      N_bn = D_b_T * M_invD_n;
-      N_bt = D_b_T * M_invD_t;
-      N_bs = D_b_T * M_invD_s;
-
-      N_nb = D_n_T * M_invD_b;
-      N_nn = D_n_T * M_invD_n;
-      N_nt = D_n_T * M_invD_t;
-      N_ns = D_n_T * M_invD_s;
-
-      N_tb = D_t_T * M_invD_b;
-      N_tn = D_t_T * M_invD_n;
-      N_tt = D_t_T * M_invD_t;
-      N_ts = D_t_T * M_invD_s;
-
-      N_sb = D_s_T * M_invD_b;
-      N_sn = D_s_T * M_invD_n;
-      N_st = D_s_T * M_invD_t;
-      N_ss = D_s_T * M_invD_s;
-    } break;
-  }
-  data_container->system_timer.stop("ChLcpSolverParallel_N");
+  data_manager->system_timer.stop("ChLcpSolverParallel_N");
 }
 
 void ChLcpSolverParallelDVI::SetR() {
   LOG(INFO) << "ChLcpSolverParallelDVI::SetR()";
-  if (data_container->num_constraints <= 0) {
+  if (data_manager->num_constraints <= 0) {
     return;
   }
 
-  DynamicVector<real>& R = data_container->host_data.R;
-  const DynamicVector<real>& R_full = data_container->host_data.R_full;
+  DynamicVector<real>& R = data_manager->host_data.R;
+  const DynamicVector<real>& R_full = data_manager->host_data.R_full;
 
-  uint num_contacts = data_container->num_contacts;
-  uint num_unilaterals = data_container->num_unilaterals;
-  uint num_bilaterals = data_container->num_bilaterals;
-  R.resize(data_container->num_constraints);
+  uint num_contacts = data_manager->num_rigid_contacts;
+  uint num_unilaterals = data_manager->num_unilaterals;
+  uint num_bilaterals = data_manager->num_bilaterals;
+  R.resize(data_manager->num_constraints);
   reset(R);
 
-  switch (data_container->settings.solver.local_solver_mode) {
+  switch (data_manager->settings.solver.local_solver_mode) {
     case BILATERAL: {
       blaze::subvector(R, num_unilaterals, num_bilaterals) = blaze::subvector(R_full, num_unilaterals, num_bilaterals);
     } break;
@@ -419,33 +333,33 @@ void ChLcpSolverParallelDVI::SetR() {
 
 void ChLcpSolverParallelDVI::ComputeImpulses() {
   LOG(INFO) << "ChLcpSolverParallelDVI::ComputeImpulses()";
-  DynamicVector<real>& v = data_container->host_data.v;
+  DynamicVector<real>& v = data_manager->host_data.v;
 
-  const DynamicVector<real>& M_invk = data_container->host_data.M_invk;
-  const DynamicVector<real>& gamma = data_container->host_data.gamma;
+  const DynamicVector<real>& M_invk = data_manager->host_data.M_invk;
+  const DynamicVector<real>& gamma = data_manager->host_data.gamma;
 
-  const CompressedMatrix<real>& M_invD_n = data_container->host_data.M_invD_n;
-  const CompressedMatrix<real>& M_invD_t = data_container->host_data.M_invD_t;
-  const CompressedMatrix<real>& M_invD_s = data_container->host_data.M_invD_s;
-  const CompressedMatrix<real>& M_invD_b = data_container->host_data.M_invD_b;
+  const CompressedMatrix<real>& M_invD_n = data_manager->host_data.M_invD_n;
+  const CompressedMatrix<real>& M_invD_t = data_manager->host_data.M_invD_t;
+  const CompressedMatrix<real>& M_invD_s = data_manager->host_data.M_invD_s;
+  const CompressedMatrix<real>& M_invD_b = data_manager->host_data.M_invD_b;
 
-  uint num_contacts = data_container->num_contacts;
-  uint num_unilaterals = data_container->num_unilaterals;
-  uint num_bilaterals = data_container->num_bilaterals;
+  uint num_contacts = data_manager->num_rigid_contacts;
+  uint num_unilaterals = data_manager->num_unilaterals;
+  uint num_bilaterals = data_manager->num_bilaterals;
 
-  if (data_container->num_constraints > 0) {
-    blaze::DenseSubvector<const DynamicVector<real> > gamma_b =
+  if (data_manager->num_constraints > 0) {
+    ConstSubVectorType gamma_b =
         blaze::subvector(gamma, num_unilaterals, num_bilaterals);
-    blaze::DenseSubvector<const DynamicVector<real> > gamma_n = blaze::subvector(gamma, 0, num_contacts);
+    ConstSubVectorType gamma_n = blaze::subvector(gamma, 0, num_contacts);
 
     // Compute new velocity based on the lagrange multipliers
-    switch (data_container->settings.solver.solver_mode) {
+    switch (data_manager->settings.solver.solver_mode) {
       case NORMAL: {
         v = M_invk + M_invD_n * gamma_n + M_invD_b * gamma_b;
       } break;
 
       case SLIDING: {
-        blaze::DenseSubvector<const DynamicVector<real> > gamma_t =
+        ConstSubVectorType gamma_t =
             blaze::subvector(gamma, num_contacts, num_contacts * 2);
 
         v = M_invk + M_invD_n * gamma_n + M_invD_t * gamma_t + M_invD_b * gamma_b;
@@ -453,9 +367,9 @@ void ChLcpSolverParallelDVI::ComputeImpulses() {
       } break;
 
       case SPINNING: {
-        blaze::DenseSubvector<const DynamicVector<real> > gamma_t =
+        ConstSubVectorType gamma_t =
             blaze::subvector(gamma, num_contacts, num_contacts * 2);
-        blaze::DenseSubvector<const DynamicVector<real> > gamma_s =
+        ConstSubVectorType gamma_s =
             blaze::subvector(gamma, num_contacts * 3, num_contacts * 3);
 
         v = M_invk + M_invD_n * gamma_n + M_invD_t * gamma_t + M_invD_s * gamma_s + M_invD_b * gamma_b;
@@ -470,21 +384,11 @@ void ChLcpSolverParallelDVI::ComputeImpulses() {
 }
 
 void ChLcpSolverParallelDVI::PreSolve() {
-  if (data_container->num_contacts <= 0) {
-    return;
-  }
-
-  if (data_container->settings.solver.solver_mode == NORMAL) {
-    return;
-  }
-
-  if (data_container->settings.solver.presolve) {
-    rigid_rigid.SolveLocal();
-  }
+//Currently not supported, might be added back in the future
 }
 
 void ChLcpSolverParallelDVI::ChangeSolverType(SOLVERTYPE type) {
-  data_container->settings.solver.solver_type = type;
+  data_manager->settings.solver.solver_type = type;
 
   if (this->solver) {
     delete (this->solver);

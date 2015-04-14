@@ -45,7 +45,8 @@ struct collision_settings {
     // many cores you are using.
     bins_per_axis = I3(20, 20, 20);
     narrowphase_algorithm = NARROWPHASE_HYBRID_MPR;
-    // edge_radius = 0.1;
+    grid_density = 5;
+    fixed_bins = true;
   }
 
   real3 min_bounding_point, max_bounding_point;
@@ -71,7 +72,9 @@ struct collision_settings {
   // detection code. The narrowphase_algorithm parameter can be used to change
   // the type of narrowphase used at runtime.
   NARROWPHASETYPE narrowphase_algorithm;
-  // real edge_radius;
+  real grid_density;
+  //use fixed number of bins instead of tuning them
+  bool fixed_bins;
 };
 // solver_settings, like the name implies is the structure that contains all
 // settings associated with the parallel solver.
@@ -82,7 +85,6 @@ struct solver_settings {
     tolerance_objective = 1e-6;
     collision_in_solver = false;
     update_rhs = false;
-    scale_mass_matrix = false;
     verbose = false;
     test_objective = false;
 
@@ -152,7 +154,6 @@ struct solver_settings {
   bool update_rhs;
   bool presolve;
   bool compute_N;
-  bool scale_mass_matrix;
   bool verbose;
   bool test_objective;
   real cohesion_epsilon;
@@ -214,12 +215,7 @@ struct settings_container {
     // I don't really check to see if max_threads is > than min_threads
     // not sure if that is a huge issue
     perform_thread_tuning = ((min_threads == max_threads) ? false : true);
-    perform_bin_tuning = true;
     system_type = SYSTEM_DVI;
-    // increase or decrease the number of bins by 2
-    bin_perturb_size = 2;
-    // bins will be tuned every 20 frames
-    bin_tuning_frequency = 20;
     step_size = .01;
   }
 
@@ -233,17 +229,6 @@ struct settings_container {
   // it changes the number of threads, if not, it decreases the number of threads
   // back to the original value.
   bool perform_thread_tuning;
-  // Bin tuning involves changing the size of the bins in order to improve
-  // the performance of the broadphase collision detection. Every
-  // bin_tuning_frequency steps the bins are increased for a period of time and
-  // and average time is computed. If this time is less than the previous average
-  // the bins are increased, if not they are left unchanged from the old value.
-  bool perform_bin_tuning;
-  // This parameter defines how large of a change to make to the number of bins
-  // on each axis
-  int bin_perturb_size;
-  // This parameter defines how often the number of bins are increased/decreased
-  int bin_tuning_frequency;
   // The minimum number of threads that will ever be used by this simulation.
   // If you know a good number of threads for your simulation set the minimum so
   // that the simulation is running optimally from the start
