@@ -43,8 +43,6 @@
 #include "chrono_opengl/ChOpenGLWindow.h"
 #endif
 
-#include "demo_utils.h"
-
 using namespace chrono;
 using namespace chrono::collision;
 
@@ -72,7 +70,7 @@ SpecimenMaterial material = GLASS;
 
 // Predefined specimen geometries
 enum SpecimenGeom { HARTL_OOI, STANDARD_BOX, SMALL_BOX, JENIKE_SHEAR, STANDARD_TRIAXIAL, SMALL_TRIAXIAL };
-SpecimenGeom geom = SMALL_BOX;
+SpecimenGeom geom = SMALL_TRIAXIAL;
 
 // Confining pre-stress properties (Pa)
 //double sigma_a = 24.2e3;
@@ -422,7 +420,7 @@ int main(int argc, char* argv[]) {
   wall_3->SetIdentifier(wall_3Id);
   wall_3->SetMass(wall_mass);
   wall_3->SetPos(ChVector<>(-(Lx0 / 2 + thickness / 2), 0, Lz0 / 2));
-  wall_3->SetBodyFixed(false);
+  wall_3->SetBodyFixed(true);
   wall_3->SetCollide(true);
 
   wall_3->SetMaterialSurface(mat_ext);
@@ -440,7 +438,7 @@ int main(int argc, char* argv[]) {
   wall_4->SetIdentifier(wall_4Id);
   wall_4->SetMass(wall_mass);
   wall_4->SetPos(ChVector<>(Lx0 / 2 + thickness / 2, 0, Lz0 / 2));
-  wall_4->SetBodyFixed(false);
+  wall_4->SetBodyFixed(true);
   wall_4->SetCollide(true);
 
   wall_4->SetMaterialSurface(mat_ext);
@@ -458,7 +456,7 @@ int main(int argc, char* argv[]) {
   wall_5->SetIdentifier(wall_5Id);
   wall_5->SetMass(wall_mass);
   wall_5->SetPos(ChVector<>(0, -(Ly0 / 2 + thickness / 2), Lz0 / 2));
-  wall_5->SetBodyFixed(false);
+  wall_5->SetBodyFixed(true);
   wall_5->SetCollide(true);
 
   wall_5->SetMaterialSurface(mat_ext);
@@ -476,7 +474,7 @@ int main(int argc, char* argv[]) {
   wall_6->SetIdentifier(wall_6Id);
   wall_6->SetMass(wall_mass);
   wall_6->SetPos(ChVector<>(0, Ly0 / 2 + thickness / 2, Lz0 / 2));
-  wall_6->SetBodyFixed(false);
+  wall_6->SetBodyFixed(true);
   wall_6->SetCollide(true);
 
   wall_6->SetMaterialSurface(mat_ext);
@@ -499,7 +497,7 @@ int main(int argc, char* argv[]) {
 			  -(Ly0 / 2 + thickness / 2) * sin(CH_C_PI / 6),
 			  Lz0 / 2));
 	  wall_7->SetRot(z30);
-	  wall_7->SetBodyFixed(false);
+	  wall_7->SetBodyFixed(true);
 	  wall_7->SetCollide(true);
 
 	  wall_7->SetMaterialSurface(mat_ext);
@@ -520,7 +518,7 @@ int main(int argc, char* argv[]) {
 			  (Ly0 / 2 + thickness / 2) * sin(CH_C_PI / 6),
 			  Lz0 / 2));
 	  wall_8->SetRot(z30);
-	  wall_8->SetBodyFixed(false);
+	  wall_8->SetBodyFixed(true);
 	  wall_8->SetCollide(true);
 
 	  wall_8->SetMaterialSurface(mat_ext);
@@ -541,7 +539,7 @@ int main(int argc, char* argv[]) {
 			  -(Ly0 / 2 + thickness / 2) * sin(CH_C_PI / 3),
 			  Lz0 / 2));
 	  wall_9->SetRot(z60);
-	  wall_9->SetBodyFixed(false);
+	  wall_9->SetBodyFixed(true);
 	  wall_9->SetCollide(true);
 
 	  wall_9->SetMaterialSurface(mat_ext);
@@ -562,7 +560,7 @@ int main(int argc, char* argv[]) {
 			  (Ly0 / 2 + thickness / 2) * sin(CH_C_PI / 3),
 			  Lz0 / 2));
 	  wall_10->SetRot(z60);
-	  wall_10->SetBodyFixed(false);
+	  wall_10->SetBodyFixed(true);
 	  wall_10->SetCollide(true);
 
 	  wall_10->SetMaterialSurface(mat_ext);
@@ -583,7 +581,7 @@ int main(int argc, char* argv[]) {
 			  -(Ly0 / 2 + thickness / 2) * cos(CH_C_PI / 6),
 			  Lz0 / 2));
 	  wall_11->SetRot(z30);
-	  wall_11->SetBodyFixed(false);
+	  wall_11->SetBodyFixed(true);
 	  wall_11->SetCollide(true);
 
 	  wall_11->SetMaterialSurface(mat_ext);
@@ -604,7 +602,7 @@ int main(int argc, char* argv[]) {
 			  (Ly0 / 2 + thickness / 2) * cos(CH_C_PI / 6),
 			  Lz0 / 2));
 	  wall_12->SetRot(z30);
-	  wall_12->SetBodyFixed(false);
+	  wall_12->SetBodyFixed(true);
 	  wall_12->SetCollide(true);
 
 	  wall_12->SetMaterialSurface(mat_ext);
@@ -625,7 +623,7 @@ int main(int argc, char* argv[]) {
 			  -(Ly0 / 2 + thickness / 2) * cos(CH_C_PI / 3),
 			  Lz0 / 2));
 	  wall_13->SetRot(z60);
-	  wall_13->SetBodyFixed(false);
+	  wall_13->SetBodyFixed(true);
 	  wall_13->SetCollide(true);
 
 	  wall_13->SetMaterialSurface(mat_ext);
@@ -646,7 +644,7 @@ int main(int argc, char* argv[]) {
 			  (Ly0 / 2 + thickness / 2) * cos(CH_C_PI / 3),
 			  Lz0 / 2));
 	  wall_14->SetRot(z60);
-	  wall_14->SetBodyFixed(false);
+	  wall_14->SetBodyFixed(true);
 	  wall_14->SetCollide(true);
 
 	  wall_14->SetMaterialSurface(mat_ext);
@@ -944,8 +942,6 @@ int main(int argc, char* argv[]) {
 #else
     my_system->DoStepDynamics(time_step);
 #endif
-
-//    TimingOutput(my_system, &statsStream);
 
     //  Output to files and screen
 

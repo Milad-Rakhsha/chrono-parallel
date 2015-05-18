@@ -43,8 +43,6 @@
 #include "chrono_opengl/ChOpenGLWindow.h"
 #endif
 
-#include "demo_utils.h"
-
 using namespace chrono;
 using namespace chrono::collision;
 
@@ -612,8 +610,6 @@ int main(int argc, char* argv[]) {
 #else
     my_system->DoStepDynamics(time_step);
 #endif
-
-//    TimingOutput(my_system, &statsStream);
 
     //  Output to files
 
