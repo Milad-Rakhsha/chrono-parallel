@@ -54,6 +54,7 @@ using std::endl;
 // Specimen definition
 // -----------------------------------------------------------------------------
 
+bool start_walls_fixed = false; // for debugging
 bool visible_walls = true;
 
 double gravity = 9.81; // m/s^2
@@ -104,7 +105,7 @@ bool thread_tuning = false;
 // Solver settings
 #ifdef USE_DEM
 double time_step = 1e-5;
-double tolerance = 0.01;
+double tolerance = 0.1;
 int max_iteration_bilateral = 100;
 #else
 double time_step = 1e-4;
@@ -121,10 +122,10 @@ double bilateral_clamp_speed = 0.1;
 
 // Simulation parameters
 #ifdef USE_DEM
-double settling_time = 0.2;
+double settling_time = 0.02;
 double simulation_time = 0.3;
 #else
-double settling_time = 0.2;
+double settling_time = 0.02;
 double simulation_time = 0.3;
 #endif
 
@@ -420,7 +421,7 @@ int main(int argc, char* argv[]) {
   wall_3->SetIdentifier(wall_3Id);
   wall_3->SetMass(wall_mass);
   wall_3->SetPos(ChVector<>(-(Lx0 / 2 + thickness / 2), 0, Lz0 / 2));
-  wall_3->SetBodyFixed(true);
+  wall_3->SetBodyFixed(start_walls_fixed);
   wall_3->SetCollide(true);
 
   wall_3->SetMaterialSurface(mat_ext);
@@ -438,7 +439,7 @@ int main(int argc, char* argv[]) {
   wall_4->SetIdentifier(wall_4Id);
   wall_4->SetMass(wall_mass);
   wall_4->SetPos(ChVector<>(Lx0 / 2 + thickness / 2, 0, Lz0 / 2));
-  wall_4->SetBodyFixed(true);
+  wall_4->SetBodyFixed(start_walls_fixed);
   wall_4->SetCollide(true);
 
   wall_4->SetMaterialSurface(mat_ext);
@@ -456,7 +457,7 @@ int main(int argc, char* argv[]) {
   wall_5->SetIdentifier(wall_5Id);
   wall_5->SetMass(wall_mass);
   wall_5->SetPos(ChVector<>(0, -(Ly0 / 2 + thickness / 2), Lz0 / 2));
-  wall_5->SetBodyFixed(true);
+  wall_5->SetBodyFixed(start_walls_fixed);
   wall_5->SetCollide(true);
 
   wall_5->SetMaterialSurface(mat_ext);
@@ -474,7 +475,7 @@ int main(int argc, char* argv[]) {
   wall_6->SetIdentifier(wall_6Id);
   wall_6->SetMass(wall_mass);
   wall_6->SetPos(ChVector<>(0, Ly0 / 2 + thickness / 2, Lz0 / 2));
-  wall_6->SetBodyFixed(true);
+  wall_6->SetBodyFixed(start_walls_fixed);
   wall_6->SetCollide(true);
 
   wall_6->SetMaterialSurface(mat_ext);
@@ -497,7 +498,7 @@ int main(int argc, char* argv[]) {
 			  -(Ly0 / 2 + thickness / 2) * sin(CH_C_PI / 6),
 			  Lz0 / 2));
 	  wall_7->SetRot(z30);
-	  wall_7->SetBodyFixed(true);
+	  wall_7->SetBodyFixed(start_walls_fixed);
 	  wall_7->SetCollide(true);
 
 	  wall_7->SetMaterialSurface(mat_ext);
@@ -518,7 +519,7 @@ int main(int argc, char* argv[]) {
 			  (Ly0 / 2 + thickness / 2) * sin(CH_C_PI / 6),
 			  Lz0 / 2));
 	  wall_8->SetRot(z30);
-	  wall_8->SetBodyFixed(true);
+	  wall_8->SetBodyFixed(start_walls_fixed);
 	  wall_8->SetCollide(true);
 
 	  wall_8->SetMaterialSurface(mat_ext);
@@ -539,7 +540,7 @@ int main(int argc, char* argv[]) {
 			  -(Ly0 / 2 + thickness / 2) * sin(CH_C_PI / 3),
 			  Lz0 / 2));
 	  wall_9->SetRot(z60);
-	  wall_9->SetBodyFixed(true);
+	  wall_9->SetBodyFixed(start_walls_fixed);
 	  wall_9->SetCollide(true);
 
 	  wall_9->SetMaterialSurface(mat_ext);
@@ -560,7 +561,7 @@ int main(int argc, char* argv[]) {
 			  (Ly0 / 2 + thickness / 2) * sin(CH_C_PI / 3),
 			  Lz0 / 2));
 	  wall_10->SetRot(z60);
-	  wall_10->SetBodyFixed(true);
+	  wall_10->SetBodyFixed(start_walls_fixed);
 	  wall_10->SetCollide(true);
 
 	  wall_10->SetMaterialSurface(mat_ext);
@@ -581,7 +582,7 @@ int main(int argc, char* argv[]) {
 			  -(Ly0 / 2 + thickness / 2) * cos(CH_C_PI / 6),
 			  Lz0 / 2));
 	  wall_11->SetRot(z30);
-	  wall_11->SetBodyFixed(true);
+	  wall_11->SetBodyFixed(start_walls_fixed);
 	  wall_11->SetCollide(true);
 
 	  wall_11->SetMaterialSurface(mat_ext);
@@ -602,7 +603,7 @@ int main(int argc, char* argv[]) {
 			  (Ly0 / 2 + thickness / 2) * cos(CH_C_PI / 6),
 			  Lz0 / 2));
 	  wall_12->SetRot(z30);
-	  wall_12->SetBodyFixed(true);
+	  wall_12->SetBodyFixed(start_walls_fixed);
 	  wall_12->SetCollide(true);
 
 	  wall_12->SetMaterialSurface(mat_ext);
@@ -623,7 +624,7 @@ int main(int argc, char* argv[]) {
 			  -(Ly0 / 2 + thickness / 2) * cos(CH_C_PI / 3),
 			  Lz0 / 2));
 	  wall_13->SetRot(z60);
-	  wall_13->SetBodyFixed(true);
+	  wall_13->SetBodyFixed(start_walls_fixed);
 	  wall_13->SetCollide(true);
 
 	  wall_13->SetMaterialSurface(mat_ext);
@@ -644,7 +645,7 @@ int main(int argc, char* argv[]) {
 			  (Ly0 / 2 + thickness / 2) * cos(CH_C_PI / 3),
 			  Lz0 / 2));
 	  wall_14->SetRot(z60);
-	  wall_14->SetBodyFixed(true);
+	  wall_14->SetBodyFixed(start_walls_fixed);
 	  wall_14->SetCollide(true);
 
 	  wall_14->SetMaterialSurface(mat_ext);
@@ -830,6 +831,7 @@ int main(int argc, char* argv[]) {
 	  prismatic_wall_14_1->Initialize(wall_14, wall_1, ChCoordsys<>(ChVector<>(0, 0, 0), z2wall_13_14));
 	  my_system->AddLink(prismatic_wall_14_1);
   }
+
   // Setup output
 
   ChStreamOutAsciiFile stressStream(stress_file.c_str());
@@ -843,8 +845,8 @@ int main(int argc, char* argv[]) {
 #ifdef CHRONO_PARALLEL_HAS_OPENGL
   opengl::ChOpenGLWindow& gl_window = opengl::ChOpenGLWindow::getInstance();
   gl_window.Initialize(800, 600, title.c_str(), my_system);
-  gl_window.SetCamera(ChVector<>(0, 0, 3 * Lz0), ChVector<>(0, 0, 0), ChVector<>(0, 1, 0), max_diameter, max_diameter);
-  gl_window.SetRenderMode(opengl::SOLID);
+  gl_window.SetCamera(ChVector<>(10 * Lx0, 0, 0), ChVector<>(0, 0, 0), ChVector<>(0, 0, 1), max_diameter, max_diameter);
+  gl_window.SetRenderMode(opengl::WIREFRAME);
 #endif
 
   // Begin simulation
