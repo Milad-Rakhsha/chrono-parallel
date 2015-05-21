@@ -54,7 +54,7 @@ using std::endl;
 // Specimen definition
 // -----------------------------------------------------------------------------
 
-bool start_walls_fixed = false; // for debugging
+bool start_walls_fixed = true; // for debugging
 bool visible_walls = true;
 
 double gravity = 9.81; // m/s^2
@@ -71,21 +71,9 @@ SpecimenMaterial material = GLASS;
 
 // Predefined specimen geometries
 enum SpecimenGeom { HARTL_OOI, STANDARD_BOX, SMALL_BOX, JENIKE_SHEAR, STANDARD_TRIAXIAL, SMALL_TRIAXIAL };
-SpecimenGeom geom = SMALL_TRIAXIAL;
+SpecimenGeom geom = STANDARD_TRIAXIAL;
 
-// Confining pre-stress properties (Pa)
-//double sigma_a = 24.2e3;
-//double sigma_b = 24.2e3;
-//double sigma_c = 24.2e3;
-
-//double sigma_a = 12.5e3;
-//double sigma_b = 12.5e3;
-//double sigma_c = 12.5e3;
-
-//double sigma_a = 6.4e3;
-//double sigma_b = 6.4e3;
-//double sigma_c = 6.4e3;
-
+// Compressive pre-stress (Pa)
 double sigma_a = 3.1e3;
 double sigma_b = 3.1e3;
 double sigma_c = 3.1e3;
@@ -122,10 +110,10 @@ double bilateral_clamp_speed = 0.1;
 
 // Simulation parameters
 #ifdef USE_DEM
-double settling_time = 0.02;
+double settling_time = 0.2;
 double simulation_time = 0.3;
 #else
-double settling_time = 0.02;
+double settling_time = 0.2;
 double simulation_time = 0.3;
 #endif
 
@@ -140,6 +128,7 @@ const std::string pov_dir = out_dir + "/POVRAY";
 const std::string stress_file = out_dir + "/specimen_stress.dat";
 const std::string force_file = out_dir + "/specimen_force.dat";
 const std::string stats_file = out_dir + "/stats.dat";
+const std::string specimen_ckpnt_file = out_dir + "/specimen.dat";
 
 bool write_povray_data = true;
 
@@ -281,7 +270,6 @@ int main(int argc, char* argv[]) {
   int wall_13Id = -13;
   int wall_14Id = -14;
 
-  double Lx, Ly, Lz, diam;
   double max_diameter = 0;
   double max_mass = 0;
 
@@ -766,71 +754,59 @@ int main(int argc, char* argv[]) {
   ChSharedPtr<ChLinkLockPrismatic> prismatic_wall_3_1(new ChLinkLockPrismatic);
   prismatic_wall_3_1->SetName("prismatic_wall_3_1");
   prismatic_wall_3_1->Initialize(wall_3, wall_1, ChCoordsys<>(ChVector<>(0, 0, 0), z2x));
-  my_system->AddLink(prismatic_wall_3_1);
 
   ChSharedPtr<ChLinkLockPrismatic> prismatic_wall_4_1(new ChLinkLockPrismatic);
   prismatic_wall_4_1->SetName("prismatic_wall_4_1");
   prismatic_wall_4_1->Initialize(wall_4, wall_1, ChCoordsys<>(ChVector<>(0, 0, 0), z2x));
-  my_system->AddLink(prismatic_wall_4_1);
 
   ChSharedPtr<ChLinkLockPrismatic> prismatic_wall_5_1(new ChLinkLockPrismatic);
   prismatic_wall_5_1->SetName("prismatic_wall_5_1");
   prismatic_wall_5_1->Initialize(wall_5, wall_1, ChCoordsys<>(ChVector<>(0, 0, 0), z2y));
-  my_system->AddLink(prismatic_wall_5_1);
 
   ChSharedPtr<ChLinkLockPrismatic> prismatic_wall_6_1(new ChLinkLockPrismatic);
   prismatic_wall_6_1->SetName("prismatic_wall_6_1");
   prismatic_wall_6_1->Initialize(wall_6, wall_1, ChCoordsys<>(ChVector<>(0, 0, 0), z2y));
-  my_system->AddLink(prismatic_wall_6_1);
 
   ChQuaternion<> z2wall_7_8 = z30%z2x;
   ChQuaternion<> z2wall_9_10 = z60%z2x;
   ChQuaternion<> z2wall_11_12 = z30%z2y;
   ChQuaternion<> z2wall_13_14 = z60%z2y;
 
-  if (cylinder == true) {
-	  // Create prismatic (translational) joints between an additional eight walls and the ground.
+  // For cylinder only
 
-	  ChSharedPtr<ChLinkLockPrismatic> prismatic_wall_7_1(new ChLinkLockPrismatic);
-	  prismatic_wall_7_1->SetName("prismatic_wall_7_1");
-	  prismatic_wall_7_1->Initialize(wall_7, wall_1, ChCoordsys<>(ChVector<>(0, 0, 0), z2wall_7_8));
-	  my_system->AddLink(prismatic_wall_7_1);
+  // Create prismatic (translational) joints between an additional eight walls and the ground.
 
-	  ChSharedPtr<ChLinkLockPrismatic> prismatic_wall_8_1(new ChLinkLockPrismatic);
-	  prismatic_wall_8_1->SetName("prismatic_wall_8_1");
-	  prismatic_wall_8_1->Initialize(wall_8, wall_1, ChCoordsys<>(ChVector<>(0, 0, 0), z2wall_7_8));
-	  my_system->AddLink(prismatic_wall_8_1);
+  ChSharedPtr<ChLinkLockPrismatic> prismatic_wall_7_1(new ChLinkLockPrismatic);
+  prismatic_wall_7_1->SetName("prismatic_wall_7_1");
+  prismatic_wall_7_1->Initialize(wall_7, wall_1, ChCoordsys<>(ChVector<>(0, 0, 0), z2wall_7_8));
 
-	  ChSharedPtr<ChLinkLockPrismatic> prismatic_wall_9_1(new ChLinkLockPrismatic);
-	  prismatic_wall_9_1->SetName("prismatic_wall_9_1");
-	  prismatic_wall_9_1->Initialize(wall_9, wall_1, ChCoordsys<>(ChVector<>(0, 0, 0), z2wall_9_10));
-	  my_system->AddLink(prismatic_wall_9_1);
+  ChSharedPtr<ChLinkLockPrismatic> prismatic_wall_8_1(new ChLinkLockPrismatic);
+  prismatic_wall_8_1->SetName("prismatic_wall_8_1");
+  prismatic_wall_8_1->Initialize(wall_8, wall_1, ChCoordsys<>(ChVector<>(0, 0, 0), z2wall_7_8));
 
-	  ChSharedPtr<ChLinkLockPrismatic> prismatic_wall_10_1(new ChLinkLockPrismatic);
-	  prismatic_wall_10_1->SetName("prismatic_wall_10_1");
-	  prismatic_wall_10_1->Initialize(wall_10, wall_1, ChCoordsys<>(ChVector<>(0, 0, 0), z2wall_9_10));
-	  my_system->AddLink(prismatic_wall_10_1);
+  ChSharedPtr<ChLinkLockPrismatic> prismatic_wall_9_1(new ChLinkLockPrismatic);
+  prismatic_wall_9_1->SetName("prismatic_wall_9_1");
+  prismatic_wall_9_1->Initialize(wall_9, wall_1, ChCoordsys<>(ChVector<>(0, 0, 0), z2wall_9_10));
 
-	  ChSharedPtr<ChLinkLockPrismatic> prismatic_wall_11_1(new ChLinkLockPrismatic);
-	  prismatic_wall_11_1->SetName("prismatic_wall_11_1");
-	  prismatic_wall_11_1->Initialize(wall_11, wall_1, ChCoordsys<>(ChVector<>(0, 0, 0), z2wall_11_12));
-	  my_system->AddLink(prismatic_wall_11_1);
+  ChSharedPtr<ChLinkLockPrismatic> prismatic_wall_10_1(new ChLinkLockPrismatic);
+  prismatic_wall_10_1->SetName("prismatic_wall_10_1");
+  prismatic_wall_10_1->Initialize(wall_10, wall_1, ChCoordsys<>(ChVector<>(0, 0, 0), z2wall_9_10));
 
-	  ChSharedPtr<ChLinkLockPrismatic> prismatic_wall_12_1(new ChLinkLockPrismatic);
-	  prismatic_wall_12_1->SetName("prismatic_wall_12_1");
-	  prismatic_wall_12_1->Initialize(wall_12, wall_1, ChCoordsys<>(ChVector<>(0, 0, 0), z2wall_11_12));
-	  my_system->AddLink(prismatic_wall_12_1);
+  ChSharedPtr<ChLinkLockPrismatic> prismatic_wall_11_1(new ChLinkLockPrismatic);
+  prismatic_wall_11_1->SetName("prismatic_wall_11_1");
+  prismatic_wall_11_1->Initialize(wall_11, wall_1, ChCoordsys<>(ChVector<>(0, 0, 0), z2wall_11_12));
 
-	  ChSharedPtr<ChLinkLockPrismatic> prismatic_wall_13_1(new ChLinkLockPrismatic);
-	  prismatic_wall_13_1->SetName("prismatic_wall_13_1");
-	  prismatic_wall_13_1->Initialize(wall_13, wall_1, ChCoordsys<>(ChVector<>(0, 0, 0), z2wall_13_14));
-	  my_system->AddLink(prismatic_wall_13_1);
+  ChSharedPtr<ChLinkLockPrismatic> prismatic_wall_12_1(new ChLinkLockPrismatic);
+  prismatic_wall_12_1->SetName("prismatic_wall_12_1");
+  prismatic_wall_12_1->Initialize(wall_12, wall_1, ChCoordsys<>(ChVector<>(0, 0, 0), z2wall_11_12));
 
-	  ChSharedPtr<ChLinkLockPrismatic> prismatic_wall_14_1(new ChLinkLockPrismatic);
-	  prismatic_wall_14_1->SetName("prismatic_wall_14_1");
-	  prismatic_wall_14_1->Initialize(wall_14, wall_1, ChCoordsys<>(ChVector<>(0, 0, 0), z2wall_13_14));
-	  my_system->AddLink(prismatic_wall_14_1);
-  }
+  ChSharedPtr<ChLinkLockPrismatic> prismatic_wall_13_1(new ChLinkLockPrismatic);
+  prismatic_wall_13_1->SetName("prismatic_wall_13_1");
+  prismatic_wall_13_1->Initialize(wall_13, wall_1, ChCoordsys<>(ChVector<>(0, 0, 0), z2wall_13_14));
+
+  ChSharedPtr<ChLinkLockPrismatic> prismatic_wall_14_1(new ChLinkLockPrismatic);
+  prismatic_wall_14_1->SetName("prismatic_wall_14_1");
+  prismatic_wall_14_1->Initialize(wall_14, wall_1, ChCoordsys<>(ChVector<>(0, 0, 0), z2wall_13_14));
 
   // Setup output
 
@@ -857,16 +833,23 @@ int main(int argc, char* argv[]) {
   real3 force1, force2, force3, force4, force5;
   real3 force6, force7, force8, force9, force10;
   real3 force11, force12, force13, force14;
+  double Lx, Ly, Lz;
+  double L7, L8, L9, L10, L11, L12, L13, L14, diam;
+
+  if (dense == true)
+  	for (i = 0; i < numParticleTypes; i++) mat[i]->SetFriction(0.01f);
 
   while (my_system->GetChTime() < simulation_time) {
-    if (dense == true)
-    	for (i = 0; i < numParticleTypes; i++) mat[i]->SetFriction(0.01f);
 
     if (my_system->GetChTime() > settling_time && settled == false) {
         wall_3->SetBodyFixed(false);
         wall_4->SetBodyFixed(false);
         wall_5->SetBodyFixed(false);
         wall_6->SetBodyFixed(false);
+        my_system->AddLink(prismatic_wall_3_1);
+        my_system->AddLink(prismatic_wall_4_1);
+        my_system->AddLink(prismatic_wall_5_1);
+        my_system->AddLink(prismatic_wall_6_1);
         if (cylinder == true) {
             wall_7->SetBodyFixed(false);
             wall_8->SetBodyFixed(false);
@@ -876,13 +859,33 @@ int main(int argc, char* argv[]) {
             wall_12->SetBodyFixed(false);
             wall_13->SetBodyFixed(false);
             wall_14->SetBodyFixed(false);
+            my_system->AddLink(prismatic_wall_7_1);
+            my_system->AddLink(prismatic_wall_8_1);
+            my_system->AddLink(prismatic_wall_9_1);
+            my_system->AddLink(prismatic_wall_10_1);
+            my_system->AddLink(prismatic_wall_11_1);
+            my_system->AddLink(prismatic_wall_12_1);
+            my_system->AddLink(prismatic_wall_13_1);
+            my_system->AddLink(prismatic_wall_14_1);
         }
     	settled = true;
     }
 
-    Lz = wall_2->GetPos().z - wall_1->GetPos().z - thickness;
-    Lx = wall_4->GetPos().x - wall_3->GetPos().x - thickness;
-    Ly = wall_6->GetPos().y - wall_5->GetPos().y - thickness;
+	Lz = wall_2->GetPos().z - wall_1->GetPos().z - thickness;
+	Lx = wall_4->GetPos().x - wall_3->GetPos().x - thickness;
+	Ly = wall_6->GetPos().y - wall_5->GetPos().y - thickness;
+
+    if (cylinder == true) {
+        L7 = sqrt(wall_7->GetPos().x*wall_7->GetPos().x+wall_7->GetPos().y*wall_7->GetPos().y) - thickness / 2;
+        L8 = sqrt(wall_8->GetPos().x*wall_8->GetPos().x+wall_8->GetPos().y*wall_8->GetPos().y) - thickness / 2;
+        L9 = sqrt(wall_9->GetPos().x*wall_9->GetPos().x+wall_9->GetPos().y*wall_9->GetPos().y) - thickness / 2;
+        L10 = sqrt(wall_10->GetPos().x*wall_10->GetPos().x+wall_10->GetPos().y*wall_10->GetPos().y) - thickness / 2;
+        L11 = sqrt(wall_11->GetPos().x*wall_11->GetPos().x+wall_11->GetPos().y*wall_11->GetPos().y) - thickness / 2;
+        L12 = sqrt(wall_12->GetPos().x*wall_12->GetPos().x+wall_12->GetPos().y*wall_12->GetPos().y) - thickness / 2;
+        L13 = sqrt(wall_13->GetPos().x*wall_13->GetPos().x+wall_13->GetPos().y*wall_13->GetPos().y) - thickness / 2;
+        L14 = sqrt(wall_14->GetPos().x*wall_14->GetPos().x+wall_14->GetPos().y*wall_14->GetPos().y) - thickness / 2;
+        diam = (L7 + L8 + L9 + L10 + L11 + L12 + L13 + L14) / 4;
+    }
 
     if (settled == true) {
     	wall_2->Empty_forces_accumulators();
@@ -899,9 +902,6 @@ int main(int argc, char* argv[]) {
     		wall_12->Empty_forces_accumulators();
     		wall_13->Empty_forces_accumulators();
     		wall_14->Empty_forces_accumulators();
-
-    		diam = (Lx + Ly) / 2.0;
-
     		wall_2->Accumulate_force(ChVector<>(0, 0, -sigma_a*CH_C_PI*diam*diam/4.0),wall_2->GetPos(),false);
     		wall_3->Accumulate_force(ChVector<>(sigma_b*Lz*CH_C_PI*diam/12.0, 0, 0),wall_3->GetPos(),false);
     		wall_4->Accumulate_force(ChVector<>(-sigma_b*Lz*CH_C_PI*diam/12.0, 0, 0),wall_4->GetPos(),false);
@@ -968,33 +968,51 @@ int main(int argc, char* argv[]) {
           force14 = my_system->GetBodyContactForce(13);
       }
 
-      forceStream << my_system->GetChTime() << "\t" << Lx << "\t" << Ly << "\t" << Lz << "\t";
-      forceStream << force3.x << "\t" << force4.x << "\t" << force5.y << "\t" << force6.y << "\t";
+      forceStream << my_system->GetChTime() << "\t";
+      forceStream << Lx << "\t" << Ly << "\t";
       if (cylinder == true) {
-          forceStream << sqrt(force7.x*force7.x+force7.y*force7.y) << "\t";
+    	  forceStream << L7+L8 << "\t" << L9+L10 << "\t" << L11+L12 << "\t" << L13+L14 << "\t";
+      }
+      forceStream << Lz << "\n";
+      forceStream << "\t" << force4.x << "\t" << force6.y << "\t";
+      if (cylinder == true) {
           forceStream << sqrt(force8.x*force8.x+force8.y*force8.y) << "\t";
-          forceStream << sqrt(force9.x*force9.x+force9.y*force9.y) << "\t";
           forceStream << sqrt(force10.x*force10.x+force10.y*force10.y) << "\t";
-          forceStream << sqrt(force11.x*force11.x+force11.y*force11.y) << "\t";
           forceStream << sqrt(force12.x*force12.x+force12.y*force12.y) << "\t";
-          forceStream << sqrt(force13.x*force13.x+force13.y*force13.y) << "\t";
           forceStream << sqrt(force14.x*force14.x+force14.y*force14.y) << "\t";
       }
-      forceStream << force1.z << "\t" << force2.z << "\n";
-
-      cout << my_system->GetChTime() << "\t" << Lx << "\t" << Ly << "\t" << Lz << "\t";
-      cout << force3.x << "\t" << force4.x << "\t" << force5.y << "\t" << force6.y << "\t";
+      forceStream << force2.z << "\n";
+      forceStream << "\t" << force4.x+force3.x << "\t" << force6.y+force5.y << "\t";
       if (cylinder == true) {
-          cout << sqrt(force7.x*force7.x+force7.y*force7.y) << "\t";
+          forceStream << sqrt(force8.x*force8.x+force8.y*force8.y)-sqrt(force7.x*force7.x+force7.y*force7.y) << "\t";
+          forceStream << sqrt(force10.x*force10.x+force10.y*force10.y)-sqrt(force9.x*force9.x+force9.y*force9.y) << "\t";
+          forceStream << sqrt(force12.x*force12.x+force12.y*force12.y)-sqrt(force11.x*force11.x+force11.y*force11.y) << "\t";
+          forceStream << sqrt(force14.x*force14.x+force14.y*force14.y)-sqrt(force12.x*force12.x+force12.y*force12.y) << "\t";
+      }
+      forceStream << force2.z+force1.z << "\n";
+
+      cout << my_system->GetChTime() << "\t";
+	  cout << Lx << "\t" << Ly << "\t";
+      if (cylinder == true) {
+    	  cout << L7+L8 << "\t" << L9+L10 << "\t" << L11+L12 << "\t" << L13+L14 << "\t";
+      }
+      cout << Lz << "\n";
+      cout << "\t" << force4.x << "\t" << force6.y << "\t";
+      if (cylinder == true) {
           cout << sqrt(force8.x*force8.x+force8.y*force8.y) << "\t";
-          cout << sqrt(force9.x*force9.x+force9.y*force9.y) << "\t";
           cout << sqrt(force10.x*force10.x+force10.y*force10.y) << "\t";
-          cout << sqrt(force11.x*force11.x+force11.y*force11.y) << "\t";
           cout << sqrt(force12.x*force12.x+force12.y*force12.y) << "\t";
-          cout << sqrt(force13.x*force13.x+force13.y*force13.y) << "\t";
           cout << sqrt(force14.x*force14.x+force14.y*force14.y) << "\t";
       }
-      cout << force1.z << "\t" << force2.z << "\n";
+      cout << force2.z << "\n";
+      cout << "\t" << force4.x+force3.x << "\t" << force6.y+force5.y << "\t";
+      if (cylinder == true) {
+          cout << sqrt(force8.x*force8.x+force8.y*force8.y)-sqrt(force7.x*force7.x+force7.y*force7.y) << "\t";
+          cout << sqrt(force10.x*force10.x+force10.y*force10.y)-sqrt(force9.x*force9.x+force9.y*force9.y) << "\t";
+          cout << sqrt(force12.x*force12.x+force12.y*force12.y)-sqrt(force11.x*force11.x+force11.y*force11.y) << "\t";
+          cout << sqrt(force14.x*force14.x+force14.y*force14.y)-sqrt(force12.x*force12.x+force12.y*force12.y) << "\t";
+      }
+      cout << force2.z+force1.z << "\n";
 
       data_out_frame++;
     }
@@ -1009,6 +1027,15 @@ int main(int argc, char* argv[]) {
       visual_out_frame++;
     }
   }
+
+  if (dense == true)
+  	for (i = 0; i < numParticleTypes; i++) mat[i]->SetFriction(mu[i]);
+
+  // Create a checkpoint file for the prepared granular material specimen
+
+  cout << "Write checkpoint data to " << flush;
+  utils::WriteCheckpoint(my_system, specimen_ckpnt_file);
+  cout << my_system->Get_bodylist()->size() << " bodies" << endl;
 
   return 0;
 }
