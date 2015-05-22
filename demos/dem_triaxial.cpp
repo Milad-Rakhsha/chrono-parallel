@@ -74,13 +74,13 @@ enum SpecimenGeom { HARTL_OOI, STANDARD_BOX, SMALL_BOX, JENIKE_SHEAR, STANDARD_T
 SpecimenGeom geom = STANDARD_TRIAXIAL;
 
 // Compressive stress (Pa)
-// (-1 means unconstrained)
+// (negative means that stress is not prescribed)
 double sigma_a = -1;
 double sigma_b = 3.1e3;
 double sigma_c = 3.1e3;
 
 // Compressive strain-rate (1/s)
-// (-1 means unconstrained)
+// (prescribed whenever stress is not prescribed)
 double epsdot_a = 0.1;
 double epsdot_b = -1;
 double epsdot_c = -1;
@@ -511,12 +511,12 @@ int main(int argc, char* argv[]) {
   // Add prismatic joints to system
 
   if (cylinder == true) {
-  	if (epsdot_a > 0 && fix_constrained_walls) {
+  	if (sigma_a < 0 && fix_constrained_walls) {
   		wall_2->SetBodyFixed(true);
   	} else {
   		my_system->AddLink(prismatic_wall_2_1);
   	}
-  	if (epsdot_b > 0 && fix_constrained_walls) {
+  	if (sigma_b < 0 && fix_constrained_walls) {
   		wall_3->SetBodyFixed(true);
   		wall_4->SetBodyFixed(true);
   		wall_5->SetBodyFixed(true);
@@ -544,19 +544,19 @@ int main(int argc, char* argv[]) {
         my_system->AddLink(prismatic_wall_14_1);
   	}
   } else {
-	  	if (epsdot_a > 0 && fix_constrained_walls) {
+	  	if (sigma_a < 0 && fix_constrained_walls) {
 	  		wall_2->SetBodyFixed(true);
 	  	} else {
 	  		my_system->AddLink(prismatic_wall_2_1);
 	  	}
-	  	if (epsdot_b > 0 && fix_constrained_walls) {
+	  	if (sigma_b < 0 && fix_constrained_walls) {
 	  		wall_3->SetBodyFixed(true);
 	  		wall_4->SetBodyFixed(true);
 	  	} else {
 	      my_system->AddLink(prismatic_wall_3_1);
 	      my_system->AddLink(prismatic_wall_4_1);
 	  	}
-	  	if (epsdot_c > 0 && fix_constrained_walls) {
+	  	if (sigma_c < 0 && fix_constrained_walls) {
 	  		wall_5->SetBodyFixed(true);
 	  		wall_6->SetBodyFixed(true);
 	  	} else {
@@ -572,6 +572,16 @@ int main(int argc, char* argv[]) {
   ChStreamOutAsciiFile statsStream(stats_file.c_str());
   stressStream.SetNumFormat("%16.4e");
   forceStream.SetNumFormat("%16.4e");
+
+  if (cylinder == true) {
+      stressStream << "time" << "\t";
+      stressStream << "strain_a" << "\t" << "strain_b" << "\t";
+      stressStream << "stress_a" << "\t" << "stress_b" << "\n";
+  } else {
+      stressStream << "time" << "\t";
+      stressStream << "strain_a" << "\t" << "strain_b" << "\t" << "strain_c" << "\t";
+      stressStream << "stress_a" << "\t" << "stress_b" << "\t" << "stress_c" << "\n";
+  }
 
   // Create the OpenGL visualization window
 
@@ -592,6 +602,10 @@ int main(int argc, char* argv[]) {
   double Lx, Ly, Lz;
   double L7, L8, L9, L10, L11, L12, L13, L14, diam;
 
+  Lz0 = wall_2->GetPos().z - wall_1->GetPos().z - thickness;
+  Lx0 = wall_4->GetPos().x - wall_3->GetPos().x - thickness;
+  Ly0 = wall_6->GetPos().y - wall_5->GetPos().y - thickness;
+
   while (my_system->GetChTime() < simulation_time) {
 
 	Lz = wall_2->GetPos().z - wall_1->GetPos().z - thickness;
@@ -610,75 +624,18 @@ int main(int argc, char* argv[]) {
         diam = (L7 + L8 + L9 + L10 + L11 + L12 + L13 + L14) / 4;
     }
 
-    // Apply prescribed stresses
+    // Apply prescribed compressive stresses or strain-rates (strain-rate is prescribed whenever stress is negative)
 
     if (cylinder == true) {
-    	if (sigma_a > 0) {
-    	    wall_2->Empty_forces_accumulators();
-        	wall_2->Accumulate_force(ChVector<>(0, 0, -sigma_a*CH_C_PI*diam*diam/4.0),wall_2->GetPos(),false);
-    	}
-    	if (sigma_b > 0) {
-    	   	wall_3->Empty_forces_accumulators();
-    	   	wall_4->Empty_forces_accumulators();
-        	wall_5->Empty_forces_accumulators();
-        	wall_6->Empty_forces_accumulators();
-    		wall_7->Empty_forces_accumulators();
-    		wall_8->Empty_forces_accumulators();
-    		wall_9->Empty_forces_accumulators();
-    		wall_10->Empty_forces_accumulators();
-    		wall_11->Empty_forces_accumulators();
-    		wall_12->Empty_forces_accumulators();
-    		wall_13->Empty_forces_accumulators();
-    		wall_14->Empty_forces_accumulators();
-    		wall_3->Accumulate_force(ChVector<>(sigma_b*Lz*CH_C_PI*diam/12.0, 0, 0),wall_3->GetPos(),false);
-    		wall_4->Accumulate_force(ChVector<>(-sigma_b*Lz*CH_C_PI*diam/12.0, 0, 0),wall_4->GetPos(),false);
-    		wall_5->Accumulate_force(ChVector<>(0, sigma_b*Lz*CH_C_PI*diam/12.0, 0),wall_5->GetPos(),false);
-    		wall_6->Accumulate_force(ChVector<>(0, -sigma_b*Lz*CH_C_PI*diam/12.0, 0),wall_6->GetPos(),false);
-    		wall_7->Accumulate_force(ChVector<>(sigma_b*Lz*CH_C_PI*diam/12.0*cos(CH_C_PI/6),
-    				sigma_b*Lz*CH_C_PI*diam/12.0*sin(CH_C_PI/6), 0),wall_7->GetPos(),false);
-    		wall_8->Accumulate_force(ChVector<>(-sigma_b*Lz*CH_C_PI*diam/12.0*cos(CH_C_PI/6),
-    				-sigma_b*Lz*CH_C_PI*diam/12.0*sin(CH_C_PI/6), 0),wall_8->GetPos(),false);
-    		wall_9->Accumulate_force(ChVector<>(sigma_b*Lz*CH_C_PI*diam/12.0*cos(CH_C_PI/3),
-    				sigma_b*Lz*CH_C_PI*diam/12.0*sin(CH_C_PI/3), 0),wall_9->GetPos(),false);
-    		wall_10->Accumulate_force(ChVector<>(-sigma_b*Lz*CH_C_PI*diam/12.0*cos(CH_C_PI/3),
-    				-sigma_b*Lz*CH_C_PI*diam/12.0*sin(CH_C_PI/3), 0),wall_10->GetPos(),false);
-    		wall_11->Accumulate_force(ChVector<>(-sigma_b*Lz*CH_C_PI*diam/12.0*sin(CH_C_PI/6),
-    				sigma_b*Lz*CH_C_PI*diam/12.0*cos(CH_C_PI/6), 0),wall_11->GetPos(),false);
-    		wall_12->Accumulate_force(ChVector<>(sigma_b*Lz*CH_C_PI*diam/12.0*sin(CH_C_PI/6),
-    				-sigma_b*Lz*CH_C_PI*diam/12.0*cos(CH_C_PI/6), 0),wall_12->GetPos(),false);
-    		wall_13->Accumulate_force(ChVector<>(-sigma_b*Lz*CH_C_PI*diam/12.0*sin(CH_C_PI/3),
-    				sigma_b*Lz*CH_C_PI*diam/12.0*cos(CH_C_PI/3), 0),wall_13->GetPos(),false);
-    		wall_14->Accumulate_force(ChVector<>(sigma_b*Lz*CH_C_PI*diam/12.0*sin(CH_C_PI/3),
-    				-sigma_b*Lz*CH_C_PI*diam/12.0*cos(CH_C_PI/3), 0),wall_14->GetPos(),false);
-    	}
-    } else {
-    	if (sigma_a > 0) {
-    	    wall_2->Empty_forces_accumulators();
-    		wall_2->Accumulate_force(ChVector<>(0, 0, -sigma_a*Lx*Ly),wall_2->GetPos(),false);
-    	}
-    	if (sigma_b > 0) {
-    	   	wall_3->Empty_forces_accumulators();
-    	   	wall_4->Empty_forces_accumulators();
-    		wall_3->Accumulate_force(ChVector<>(sigma_b*Ly*Lz, 0, 0),wall_3->GetPos(),false);
-    		wall_4->Accumulate_force(ChVector<>(-sigma_b*Ly*Lz, 0, 0),wall_4->GetPos(),false);
-    	}
-    	if (sigma_c > 0) {
-    	   	wall_5->Empty_forces_accumulators();
-    	   	wall_6->Empty_forces_accumulators();
-    		wall_5->Accumulate_force(ChVector<>(0, sigma_c*Lx*Lz, 0),wall_5->GetPos(),false);
-    		wall_6->Accumulate_force(ChVector<>(0, -sigma_c*Lx*Lz, 0),wall_6->GetPos(),false);
-    	}
-    }
-
-    // Apply prescribed strain-rates
-
-    if (cylinder == true) {
-    	if (epsdot_a > 0) {
+    	if (sigma_a < 0) {
     	    wall_2->SetPos_dt(ChVector<>(0, 0, -epsdot_a*Lz));
     	    if (fix_constrained_walls)
     	    	wall_2->SetPos(ChVector<>(wall_2->GetPos().x, wall_2->GetPos().y, wall_2->GetPos().z-epsdot_a*Lz*time_step));
+    	} else {
+    		wall_2->Empty_forces_accumulators();
+        	wall_2->Accumulate_force(ChVector<>(0, 0, -sigma_a*CH_C_PI*diam*diam/4.0),wall_2->GetPos(),false);
     	}
-    	if (sigma_b > 0) {
+    	if (sigma_b < 0) {
     		wall_3->SetPos_dt(ChVector<>(epsdot_b*Lx, 0, 0));
     		wall_4->SetPos_dt(ChVector<>(-epsdot_b*Lx, 0, 0));
     		wall_5->SetPos_dt(ChVector<>(0, epsdot_b*Ly, 0));
@@ -721,28 +678,74 @@ int main(int argc, char* argv[]) {
     			wall_14->SetPos(ChVector<>(wall_14->GetPos().x+epsdot_b*(L13+L14)*sin(CH_C_PI/3)*time_step,
     					wall_14->GetPos().y-epsdot_b*(L13+L14)*cos(CH_C_PI/3)*time_step, wall_14->GetPos().z));
     		}
+    	} else {
+    	   	wall_3->Empty_forces_accumulators();
+    	   	wall_4->Empty_forces_accumulators();
+        	wall_5->Empty_forces_accumulators();
+        	wall_6->Empty_forces_accumulators();
+    		wall_7->Empty_forces_accumulators();
+    		wall_8->Empty_forces_accumulators();
+    		wall_9->Empty_forces_accumulators();
+    		wall_10->Empty_forces_accumulators();
+    		wall_11->Empty_forces_accumulators();
+    		wall_12->Empty_forces_accumulators();
+    		wall_13->Empty_forces_accumulators();
+    		wall_14->Empty_forces_accumulators();
+    		wall_3->Accumulate_force(ChVector<>(sigma_b*Lz*CH_C_PI*diam/12.0, 0, 0),wall_3->GetPos(),false);
+    		wall_4->Accumulate_force(ChVector<>(-sigma_b*Lz*CH_C_PI*diam/12.0, 0, 0),wall_4->GetPos(),false);
+    		wall_5->Accumulate_force(ChVector<>(0, sigma_b*Lz*CH_C_PI*diam/12.0, 0),wall_5->GetPos(),false);
+    		wall_6->Accumulate_force(ChVector<>(0, -sigma_b*Lz*CH_C_PI*diam/12.0, 0),wall_6->GetPos(),false);
+    		wall_7->Accumulate_force(ChVector<>(sigma_b*Lz*CH_C_PI*diam/12.0*cos(CH_C_PI/6),
+    				sigma_b*Lz*CH_C_PI*diam/12.0*sin(CH_C_PI/6), 0),wall_7->GetPos(),false);
+    		wall_8->Accumulate_force(ChVector<>(-sigma_b*Lz*CH_C_PI*diam/12.0*cos(CH_C_PI/6),
+    				-sigma_b*Lz*CH_C_PI*diam/12.0*sin(CH_C_PI/6), 0),wall_8->GetPos(),false);
+    		wall_9->Accumulate_force(ChVector<>(sigma_b*Lz*CH_C_PI*diam/12.0*cos(CH_C_PI/3),
+    				sigma_b*Lz*CH_C_PI*diam/12.0*sin(CH_C_PI/3), 0),wall_9->GetPos(),false);
+    		wall_10->Accumulate_force(ChVector<>(-sigma_b*Lz*CH_C_PI*diam/12.0*cos(CH_C_PI/3),
+    				-sigma_b*Lz*CH_C_PI*diam/12.0*sin(CH_C_PI/3), 0),wall_10->GetPos(),false);
+    		wall_11->Accumulate_force(ChVector<>(-sigma_b*Lz*CH_C_PI*diam/12.0*sin(CH_C_PI/6),
+    				sigma_b*Lz*CH_C_PI*diam/12.0*cos(CH_C_PI/6), 0),wall_11->GetPos(),false);
+    		wall_12->Accumulate_force(ChVector<>(sigma_b*Lz*CH_C_PI*diam/12.0*sin(CH_C_PI/6),
+    				-sigma_b*Lz*CH_C_PI*diam/12.0*cos(CH_C_PI/6), 0),wall_12->GetPos(),false);
+    		wall_13->Accumulate_force(ChVector<>(-sigma_b*Lz*CH_C_PI*diam/12.0*sin(CH_C_PI/3),
+    				sigma_b*Lz*CH_C_PI*diam/12.0*cos(CH_C_PI/3), 0),wall_13->GetPos(),false);
+    		wall_14->Accumulate_force(ChVector<>(sigma_b*Lz*CH_C_PI*diam/12.0*sin(CH_C_PI/3),
+    				-sigma_b*Lz*CH_C_PI*diam/12.0*cos(CH_C_PI/3), 0),wall_14->GetPos(),false);
     	}
     } else {
-    	if (sigma_a > 0) {
+    	if (sigma_a < 0) {
     	    wall_2->SetPos_dt(ChVector<>(0, 0, -epsdot_a*Lz));
     	    if (fix_constrained_walls)
     	    	wall_2->SetPos(ChVector<>(wall_2->GetPos().x, wall_2->GetPos().y, wall_2->GetPos().z-epsdot_a*Lz*time_step));
+    	} else {
+    	    wall_2->Empty_forces_accumulators();
+    		wall_2->Accumulate_force(ChVector<>(0, 0, -sigma_a*Lx*Ly),wall_2->GetPos(),false);
     	}
-    	if (sigma_b > 0) {
+    	if (sigma_b < 0) {
     		wall_3->SetPos_dt(ChVector<>(epsdot_b*Lx, 0, 0));
     		wall_4->SetPos_dt(ChVector<>(-epsdot_b*Lx, 0, 0));
     		if (fix_constrained_walls) {
     			wall_3->SetPos(ChVector<>(wall_3->GetPos().x+epsdot_b*Lx*time_step, wall_3->GetPos().y, wall_3->GetPos().z));
     			wall_4->SetPos(ChVector<>(wall_4->GetPos().x-epsdot_b*Lx*time_step, wall_4->GetPos().y, wall_4->GetPos().z));
     		}
+    	} else {
+    	   	wall_3->Empty_forces_accumulators();
+    	   	wall_4->Empty_forces_accumulators();
+    		wall_3->Accumulate_force(ChVector<>(sigma_b*Ly*Lz, 0, 0),wall_3->GetPos(),false);
+    		wall_4->Accumulate_force(ChVector<>(-sigma_b*Ly*Lz, 0, 0),wall_4->GetPos(),false);
     	}
-    	if (sigma_c > 0) {
+    	if (sigma_c < 0) {
     		wall_5->SetPos_dt(ChVector<>(0, epsdot_c*Ly, 0));
     		wall_6->SetPos_dt(ChVector<>(0, -epsdot_c*Ly, 0));
     		if (fix_constrained_walls) {
     			wall_5->SetPos(ChVector<>(wall_5->GetPos().x, wall_5->GetPos().y+epsdot_c*Ly*time_step, wall_5->GetPos().z));
     			wall_6->SetPos(ChVector<>(wall_6->GetPos().x, wall_6->GetPos().y-epsdot_c*Ly*time_step, wall_6->GetPos().z));
     		}
+    	} else {
+    	   	wall_5->Empty_forces_accumulators();
+    	   	wall_6->Empty_forces_accumulators();
+    		wall_5->Accumulate_force(ChVector<>(0, sigma_c*Lx*Lz, 0),wall_5->GetPos(),false);
+    		wall_6->Accumulate_force(ChVector<>(0, -sigma_c*Lx*Lz, 0),wall_6->GetPos(),false);
     	}
     }
 
@@ -827,6 +830,18 @@ int main(int argc, char* argv[]) {
           cout << sqrt(force14.x*force14.x+force14.y*force14.y)-sqrt(force12.x*force12.x+force12.y*force12.y) << "\t";
       }
       cout << force2.z+force1.z << "\n";
+
+      stressStream << my_system->GetChTime() << "\t";
+      stressStream << (Lz0-Lz)/Lz0 << "\t";
+      if (cylinder == true) {
+          stressStream << ((Lx0-Lx)/Lx0+(Ly0-Ly)/Ly0)/2.0 << "\t";
+          stressStream << force2.z/(CH_C_PI*diam*diam/4.0) << "\t";
+          stressStream << (force4.x-force3.x+force6.y-force5.y)/(Lz*CH_C_PI*diam/3.0) << "\n";
+      } else {
+    	  stressStream << (Lx0-Lx)/Lx0 << "\t" << (Ly0-Ly)/Ly0 << "\t";
+    	  stressStream << force2.z/(Lx*Ly) << "\t";
+    	  stressStream << (force4.x-force3.x)/(2.0*Ly*Lz) << "\t" << (force6.y-force5.y)/(2.0*Lx*Lz) << "\n";
+      }
 
       data_out_frame++;
     }

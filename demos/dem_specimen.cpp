@@ -344,7 +344,7 @@ int main(int argc, char* argv[]) {
   my_system->GetSettings()->solver.contact_recovery_speed = contact_recovery_speed;
   my_system->ChangeSolverType(APGD);
 
-  my_system->GetSettings()->collision.collision_envelope = 0.05 * radius;
+  my_system->GetSettings()->collision.collision_envelope = 0.01 * max_diameter;
 #endif
 
   my_system->GetSettings()->collision.bins_per_axis = I3(10, 10, 10);
@@ -362,7 +362,7 @@ int main(int argc, char* argv[]) {
 #else
   ChSharedPtr<ChMaterialSurface> mat_ext;
   mat_ext = ChSharedPtr<ChMaterialSurface>(new ChMaterialSurface);
-  mat_ext->SetRestitution(COR);
+  mat_ext->SetRestitution(COR_ext);
   mat_ext->SetFriction(mu_ext);
 #endif
 
@@ -702,7 +702,7 @@ int main(int argc, char* argv[]) {
 #ifdef USE_DEM
   ChSharedPtr<ChMaterialSurfaceDEM> mat[maxParticleTypes];
 #else
-  ChSharedPtr<ChMaterialSurfaceDVI> mat[maxParticleTypes];
+  ChSharedPtr<ChMaterialSurface> mat[maxParticleTypes];
 #endif
 
   for (i = 0; i < numParticleTypes; i++) {
@@ -715,7 +715,7 @@ int main(int argc, char* argv[]) {
 	  mat[i]->SetFriction(mu[i]);
 	  type->setDefaultMaterialDEM(mat[i]);
 #else
-	  mat[i] = ChSharedPtr<ChMaterialSurfaceDVI>(new ChMaterialSurfaceDVI);
+	  mat[i] = ChSharedPtr<ChMaterialSurface>(new ChMaterialSurface);
 	  mat[i]->SetRestitution(COR[i]);
 	  mat[i]->SetFriction(mu[i]);
 	  type->setDefaultMaterialDVI(mat[i]);
@@ -816,6 +816,16 @@ int main(int argc, char* argv[]) {
   stressStream.SetNumFormat("%16.4e");
   forceStream.SetNumFormat("%16.4e");
 
+  if (cylinder == true) {
+      stressStream << "time" << "\t";
+      stressStream << "strain_a" << "\t" << "strain_b" << "\t";
+      stressStream << "stress_a" << "\t" << "stress_b" << "\n";
+  } else {
+      stressStream << "time" << "\t";
+      stressStream << "strain_a" << "\t" << "strain_b" << "\t" << "strain_c" << "\t";
+      stressStream << "stress_a" << "\t" << "stress_b" << "\t" << "stress_c" << "\n";
+  }
+
   // Create the OpenGL visualization window
 
 #ifdef CHRONO_PARALLEL_HAS_OPENGL
@@ -869,6 +879,9 @@ int main(int argc, char* argv[]) {
             my_system->AddLink(prismatic_wall_14_1);
         }
     	settled = true;
+    	Lz0 = wall_2->GetPos().z - wall_1->GetPos().z - thickness;
+    	Lx0 = wall_4->GetPos().x - wall_3->GetPos().x - thickness;
+    	Ly0 = wall_6->GetPos().y - wall_5->GetPos().y - thickness;
     }
 
 	Lz = wall_2->GetPos().z - wall_1->GetPos().z - thickness;
@@ -1013,6 +1026,18 @@ int main(int argc, char* argv[]) {
           cout << sqrt(force14.x*force14.x+force14.y*force14.y)-sqrt(force12.x*force12.x+force12.y*force12.y) << "\t";
       }
       cout << force2.z+force1.z << "\n";
+
+      stressStream << my_system->GetChTime() << "\t";
+      stressStream << (Lz0-Lz)/Lz0 << "\t";
+      if (cylinder == true) {
+          stressStream << ((Lx0-Lx)/Lx0+(Ly0-Ly)/Ly0)/2.0 << "\t";
+          stressStream << force2.z/(CH_C_PI*diam*diam/4.0) << "\t";
+          stressStream << (force4.x-force3.x+force6.y-force5.y)/(Lz*CH_C_PI*diam/3.0) << "\n";
+      } else {
+    	  stressStream << (Lx0-Lx)/Lx0 << "\t" << (Ly0-Ly)/Ly0 << "\t";
+    	  stressStream << force2.z/(Lx*Ly) << "\t";
+    	  stressStream << (force4.x-force3.x)/(2.0*Ly*Lz) << "\t" << (force6.y-force5.y)/(2.0*Lx*Lz) << "\n";
+      }
 
       data_out_frame++;
     }
