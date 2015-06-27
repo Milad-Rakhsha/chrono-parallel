@@ -176,9 +176,9 @@ find_package(Thrust)
 IF(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 SET(BLAZE_DIR ""  CACHE PATH   "Where is Blaze located?")
 ELSEIF(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-FIND_PATH(BLAZE_DIR NAMES blaze/Blaze.h PATHS "/usr/include" "/usr/local/include")
+FIND_PATH(BLAZE_DIR NAMES blaze/Blaze.h PATHS "/usr/include" "/usr/local/include" ENV CPATH)
 ELSEIF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-FIND_PATH(BLAZE_DIR NAMES blaze/Blaze.h PATHS "/usr/include" "/usr/local/include")
+FIND_PATH(BLAZE_DIR NAMES blaze/Blaze.h PATHS "/usr/include" "/usr/local/include" ENV CPATH)
 ENDIF()
 
 # ------------------------------------------------------------------------------
